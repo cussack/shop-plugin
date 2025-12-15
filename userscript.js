@@ -4,7 +4,7 @@
 // @version      0.2
 // @description  Add checkboxes to select rows in MUI DataGrid
 // @author       You
-// @match        https://shop.cannabis-apotheke-luebeck.de/*
+// @match        https://shop.cannabis-apotheke-luebeck.de/account/dashboard
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=shop.cannabis-apotheke-luebeck.de
 // @grant        none
 // ==/UserScript==
@@ -84,7 +84,7 @@
         container.className = 'button-container';
         container.innerHTML = `
             <button class="toggle-button">Show Checkboxes</button>
-            <button class="action-button" disabled>Process Selected (0)</button>
+            <button class="action-button" disabled>Labels ausdrucken (0)</button>
         `;
         document.body.appendChild(container);
 
@@ -114,17 +114,83 @@
     }
 
     // Handle action button click
-    function handleAction() {
+    async function handleAction() {
         const selectedIds = Array.from(selectedRows);
-        console.log('Selected row IDs:', selectedIds);
-        alert(`Processing ${selectedIds.length} selected rows:\n${selectedIds.join(', ')}`);
-        // Add your custom action here
+        console.log('Processing labels for row IDs:', selectedIds);
+
+        for (const rowId of selectedIds) {
+            try {
+                // Find the row
+                const row = document.querySelector(`.MuiDataGrid-row[data-id="${rowId}"]`);
+                if (!row) {
+                    console.error(`Row with ID ${rowId} not found`);
+                    continue;
+                }
+
+                // Find and click the delivery button
+                const deliveryButton = row.querySelector('div[data-field="delivery"] div[role="button"]');
+                if (!deliveryButton) {
+                    console.error(`Delivery button not found for row ${rowId}`);
+                    continue;
+                }
+
+                deliveryButton.style.border = '3px solid red';
+                deliveryButton.click();
+                await new Promise(resolve => setTimeout(resolve, 50));
+
+                // Find and click the button in the modal
+                const modal = document.querySelector('div[aria-modal="true"]');
+                if (!modal) {
+                    console.error(`Modal not opened for row ${rowId}`);
+                    continue;
+                }
+
+                const modalButton = modal.querySelector('thead th button');
+                if (!modalButton) {
+                    console.error(`Modal button not found for row ${rowId}`);
+                    continue;
+                }
+
+                modalButton.style.border = '3px solid red';
+                modalButton.click();
+                await new Promise(resolve => setTimeout(resolve, 50));
+
+                // Find and click the close button twice
+                let closeButtons = document.querySelectorAll('button[aria-label="close"]');
+                console.log(`Found ${closeButtons.length} close buttons for row ${rowId}`);
+                if (closeButtons.length > 0) {
+                    // Get the innermost (last) close button
+                    let closeButton = closeButtons[closeButtons.length - 1];
+
+                    closeButton.style.border = '3px solid red';
+                    closeButton.click();
+                    await new Promise(resolve => setTimeout(resolve, 50));
+
+                    // Re-query for the second click
+                    closeButtons = document.querySelectorAll('button[aria-label="close"]');
+                    console.log(`Found ${closeButtons.length} close buttons after first click for row ${rowId}`);
+                    if (closeButtons.length > 0) {
+                        closeButton = closeButtons[closeButtons.length - 1];
+                        closeButton.style.border = '3px solid red';
+                        closeButton.click();
+                        await new Promise(resolve => setTimeout(resolve, 50));
+                    }
+                } else {
+                    console.warn(`Close button not found for row ${rowId}`);
+                }
+
+            } catch (error) {
+                console.error(`Error processing row ${rowId}:`, error);
+            }
+        }
+
+        console.log('Finished processing all selected rows');
     }
 
     // Update action button state
     function updateActionButton(button) {
         const count = selectedRows.size;
-        button.textContent = `Process Selected (${count})`;
+        button.textContent = `Labels ausdrucken (${count})`;
         button.disabled = count === 0;
     }
 
