@@ -6,6 +6,7 @@
 // @author       You
 // @match        https://shop.cannabis-apotheke-luebeck.de/account/dashboard
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=shop.cannabis-apotheke-luebeck.de
+// @require      https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js
 // @grant        none
 // ==/UserScript==
 
@@ -118,6 +119,8 @@
         const selectedIds = Array.from(selectedRows);
         console.log('Processing labels for row IDs:', selectedIds);
 
+        const results = [];
+
         for (const rowId of selectedIds) {
             try {
                 // Find the row
@@ -225,19 +228,18 @@
 
                     console.log('Final blobUrl:', blobUrl);
 
-                    // Fetch and hash the blob if we captured it
+                    // Fetch the blob if we captured it
                     if (blobUrl) {
                         try {
                             const response = await fetch(blobUrl);
                             const blob = await response.blob();
-                            const arrayBuffer = await blob.arrayBuffer();
-                            const uint8Array = new Uint8Array(arrayBuffer);
 
-                            // Calculate hash (using SHA-256 since MD5 isn't available in crypto.subtle)
-                            const hashBuffer = await crypto.subtle.digest('SHA-256', uint8Array);
-                            const hashArray = Array.from(new Uint8Array(hashBuffer));
-                            const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-                            console.log(`SHA-256 hash for row ${rowId}:`, hashHex);
+                            const result = {
+                                labels: blob
+                            };
+
+                            results.push(result);
+                            console.log(`Result for row ${rowId}:`, result);
                         } catch (error) {
                             console.error(`Error processing blob for row ${rowId}:`, error);
                         }
@@ -278,6 +280,60 @@
         }
 
         console.log('Finished processing all selected rows');
+        console.log('Collected results:', results);
+
+        // Merge all PDFs into one
+        if (results.length > 0) {
+            try {
+                const mergedPdf = await mergePDFs(results.map(r => r.labels));
+                console.log('Successfully merged PDFs');
+
+                // Download the merged PDF
+                downloadPDF(mergedPdf, 'merged-labels.pdf');
+
+                return mergedPdf;
+            } catch (error) {
+                console.error('Error merging PDFs:', error);
+            }
+        }
+
+        return results;
+    }
+
+    // Download a PDF blob
+    function downloadPDF(blob, filename) {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+
+    // Merge multiple PDF blobs into one
+    async function mergePDFs(blobs) {
+        const { PDFDocument } = PDFLib;
+
+        // Create a new PDF document
+        const mergedPdf = await PDFDocument.create();
+
+        // Process each blob
+        for (const blob of blobs) {
+            const arrayBuffer = await blob.arrayBuffer();
+            const pdf = await PDFDocument.load(arrayBuffer);
+
+            // Copy all pages from this PDF
+            const copiedPages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
+            copiedPages.forEach(page => {
+                mergedPdf.addPage(page);
+            });
+        }
+
+        // Save the merged PDF
+        const mergedPdfBytes = await mergedPdf.save();
+        return new Blob([mergedPdfBytes], { type: 'application/pdf' });
     }
 
     // Update action button state
