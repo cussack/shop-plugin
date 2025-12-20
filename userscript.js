@@ -260,10 +260,10 @@
                     await new Promise(resolve => setTimeout(resolve, 50));
 
                     // Re-query for the second click
-                    closeButtons = document.querySelectorAll('button[aria-label="close"]');
+                    closeButtons = document.querySelectorAll('div[role="dialog"] button[aria-label="close"]');
                     console.log(`Found ${closeButtons.length} close buttons after first click for row ${rowId}`);
                     if (closeButtons.length > 0) {
-                        closeButton = closeButtons[closeButtons.length - 1];
+                        closeButton = closeButtons[0];
                         closeButton.style.border = '3px solid red';
                         closeButton.click();
                         await new Promise(resolve => setTimeout(resolve, 50));
