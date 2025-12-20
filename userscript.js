@@ -151,9 +151,73 @@
                     continue;
                 }
 
+                // Wait for modal button to be enabled
+                let attempts = 0;
+                while (modalButton.disabled && attempts < 100) {
+                    await new Promise(resolve => setTimeout(resolve, 50));
+                    attempts++;
+                }
+
+                if (modalButton.disabled) {
+                    console.error(`Modal button never enabled for row ${rowId}`);
+                    continue;
+                }
+
+                console.log(`Modal button enabled after ${attempts * 50}ms for row ${rowId}`);
+
                 modalButton.style.border = '3px solid red';
                 modalButton.click();
                 await new Promise(resolve => setTimeout(resolve, 50));
+
+                // Find and click the form button to open blob URL
+                const formButton = document.evaluate(
+                    '//button[text()="Label erzeugen"]',
+                    document,
+                    null,
+                    XPathResult.FIRST_ORDERED_NODE_TYPE,
+                    null
+                ).singleNodeValue;
+                if (formButton) {
+                    formButton.style.border = '3px solid red';
+
+                    // Intercept blob URL opening
+                    const originalOpen = window.open;
+                    let blobUrl = null;
+                    window.open = function(url, ...args) {
+                        if (url && url.startsWith('blob:')) {
+                            blobUrl = url;
+                            console.log('Intercepted blob URL:', blobUrl);
+                            return originalOpen.call(this, url, ...args);
+                        }
+                        return originalOpen.call(this, url, ...args);
+                    };
+
+                    formButton.click();
+                    await new Promise(resolve => setTimeout(resolve, 50));
+
+                    // Restore original window.open
+                    window.open = originalOpen;
+
+                    // Fetch and hash the blob if we captured it
+                    if (blobUrl) {
+                        try {
+                            const response = await fetch(blobUrl);
+                            const blob = await response.blob();
+                            const arrayBuffer = await blob.arrayBuffer();
+                            const uint8Array = new Uint8Array(arrayBuffer);
+
+                            // Calculate hash (using SHA-256 since MD5 isn't available in crypto.subtle)
+                            const hashBuffer = await crypto.subtle.digest('SHA-256', uint8Array);
+                            const hashArray = Array.from(new Uint8Array(hashBuffer));
+                            const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+                            console.log(`SHA-256 hash for row ${rowId}:`, hashHex);
+                        } catch (error) {
+                            console.error(`Error processing blob for row ${rowId}:`, error);
+                        }
+                    }
+                } else {
+                    console.warn(`Form button not found for row ${rowId}`);
+                }
 
                 // Find and click the close button twice
                 let closeButtons = document.querySelectorAll('button[aria-label="close"]');
