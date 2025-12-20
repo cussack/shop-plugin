@@ -137,7 +137,6 @@
                     continue;
                 }
 
-                deliveryButton.style.border = '3px solid red';
                 deliveryButton.click();
                 await new Promise(resolve => setTimeout(resolve, 50));
 
@@ -168,7 +167,6 @@
 
                 console.log(`Modal button enabled after ${attempts * 50}ms for row ${rowId}`);
 
-                modalButton.style.border = '3px solid red';
                 modalButton.click();
                 await new Promise(resolve => setTimeout(resolve, 50));
 
@@ -181,8 +179,6 @@
                     null
                 ).singleNodeValue;
                 if (formButton) {
-                    formButton.style.border = '3px solid red';
-
                     // Intercept blob URL opening and prevent popup
                     const originalOpen = window.open;
                     let blobUrl = null;
@@ -257,7 +253,6 @@
                     // Get the innermost (last) close button
                     let closeButton = closeButtons[closeButtons.length - 1];
 
-                    closeButton.style.border = '3px solid red';
                     closeButton.click();
                     await new Promise(resolve => setTimeout(resolve, 50));
 
@@ -266,7 +261,6 @@
                     console.log(`Found ${closeButtons.length} close buttons after first click for row ${rowId}`);
                     if (closeButtons.length > 0) {
                         closeButton = closeButtons[0];
-                        closeButton.style.border = '3px solid red';
                         closeButton.click();
                         await new Promise(resolve => setTimeout(resolve, 50));
                     }
