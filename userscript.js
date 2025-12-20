@@ -6,12 +6,48 @@
 // @author       You
 // @match        https://shop.cannabis-apotheke-luebeck.de/account/dashboard
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=shop.cannabis-apotheke-luebeck.de
-// @require      https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js
-// @grant        none
+// @grant        GM_registerMenuCommand
+// @grant        GM_getValue
+// @grant        GM_setValue
 // ==/UserScript==
 
 (function() {
     'use strict';
+
+    // Debug mode configuration
+    const DEBUG_MODE_KEY = 'debugMode';
+    let debugMode = GM_getValue(DEBUG_MODE_KEY, false);
+
+    function toggleDebugMode() {
+        debugMode = !debugMode;
+        GM_setValue(DEBUG_MODE_KEY, debugMode);
+        alert(`Debug mode ${debugMode ? 'enabled' : 'disabled'}`);
+    }
+
+    function log(...args) {
+        if (debugMode) {
+            console.log('[Cannabis Apotheke]', ...args);
+        }
+    }
+
+    // Register menu command for debug mode toggle
+    GM_registerMenuCommand(debugMode ? '✓ Debug Mode' : 'Debug Mode', toggleDebugMode);
+
+    // Load pdf-lib dynamically
+    function loadPdfLib() {
+        return new Promise((resolve, reject) => {
+            if (window.PDFLib) {
+                resolve(window.PDFLib);
+                return;
+            }
+
+            const script = document.createElement('script');
+            script.src = 'https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js';
+            script.onload = () => resolve(window.PDFLib);
+            script.onerror = () => reject(new Error('Failed to load pdf-lib'));
+            document.head.appendChild(script);
+        });
+    }
 
     const selectedRows = new Set();
     let checkboxesVisible = false;
@@ -85,17 +121,20 @@
         container.className = 'button-container';
         container.innerHTML = `
             <button class="toggle-button">Show Checkboxes</button>
+            <button class="action-button accept-button" disabled>Accept Selected (0)</button>
             <button class="action-button" disabled>Labels ausdrucken (0)</button>
         `;
         document.body.appendChild(container);
 
-        const actionButton = container.querySelector('.action-button');
+        const actionButton = container.querySelector('.action-button:not(.accept-button)');
+        const acceptButton = container.querySelector('.accept-button');
         const toggleButton = container.querySelector('.toggle-button');
 
         actionButton.addEventListener('click', handleAction);
+        acceptButton.addEventListener('click', handleAcceptAction);
         toggleButton.addEventListener('click', () => toggleCheckboxes(toggleButton));
 
-        return { actionButton, toggleButton };
+        return { actionButton, acceptButton, toggleButton };
     }
 
     // Toggle checkboxes visibility
@@ -114,10 +153,35 @@
         }
     }
 
+    // Handle accept button click
+    async function handleAcceptAction() {
+        const selectedIds = Array.from(selectedRows);
+        log('Accepting row IDs:', selectedIds);
+
+        for (const rowId of selectedIds) {
+            try {
+                // Find the row
+                const row = document.querySelector(`.MuiDataGrid-row[data-id="${rowId}"]`);
+                if (!row) {
+                    console.error(`Row with ID ${rowId} not found`);
+                    continue;
+                }
+
+                // TODO: Implement acceptance logic here
+                log(`Processing acceptance for row ${rowId}`);
+
+            } catch (error) {
+                console.error(`Error accepting row ${rowId}:`, error);
+            }
+        }
+
+        log('Finished accepting all selected rows');
+    }
+
     // Handle action button click
     async function handleAction() {
         const selectedIds = Array.from(selectedRows);
-        console.log('Processing labels for row IDs:', selectedIds);
+        log('Processing labels for row IDs:', selectedIds);
 
         const results = [];
 
@@ -165,7 +229,7 @@
                     continue;
                 }
 
-                console.log(`Modal button enabled after ${attempts * 50}ms for row ${rowId}`);
+                log(`Modal button enabled after ${attempts * 50}ms for row ${rowId}`);
 
                 modalButton.click();
                 await new Promise(resolve => setTimeout(resolve, 50));
@@ -184,17 +248,17 @@
                     let blobUrl = null;
 
                     window.open = function(url, ...args) {
-                        console.log('window.open called with:', url, args);
+                        log('window.open called with:', url, args);
 
                         // Return a proxy window that intercepts location.href assignment
                         const fakeWindow = {
                             closed: false,
                             location: new Proxy({}, {
                                 set(target, prop, value) {
-                                    console.log(`Intercepted location.${prop} = ${value}`);
+                                    log(`Intercepted location.${prop} = ${value}`);
                                     if (prop === 'href' && value && value.startsWith('blob:')) {
                                         blobUrl = value;
-                                        console.log('Captured blob URL via location.href:', blobUrl);
+                                        log('Captured blob URL via location.href:', blobUrl);
                                     }
                                     target[prop] = value;
                                     return true;
@@ -210,7 +274,7 @@
                         // Also check if URL is directly a blob
                         if (url && url.startsWith('blob:')) {
                             blobUrl = url;
-                            console.log('Captured blob URL directly:', blobUrl);
+                            log('Captured blob URL directly:', blobUrl);
                         }
 
                         return fakeWindow;
@@ -222,7 +286,7 @@
                     // Restore original window.open
                     window.open = originalOpen;
 
-                    console.log('Final blobUrl:', blobUrl);
+                    log('Final blobUrl:', blobUrl);
 
                     // Fetch the blob if we captured it
                     if (blobUrl) {
@@ -235,7 +299,7 @@
                             };
 
                             results.push(result);
-                            console.log(`Result for row ${rowId}:`, result);
+                            log(`Result for row ${rowId}:`, result);
                         } catch (error) {
                             console.error(`Error processing blob for row ${rowId}:`, error);
                         }
@@ -248,7 +312,7 @@
 
                 // Find and click the close button twice
                 let closeButtons = document.querySelectorAll('button[aria-label="close"]');
-                console.log(`Found ${closeButtons.length} close buttons for row ${rowId}`);
+                log(`Found ${closeButtons.length} close buttons for row ${rowId}`);
                 if (closeButtons.length > 0) {
                     // Get the innermost (last) close button
                     let closeButton = closeButtons[closeButtons.length - 1];
@@ -258,7 +322,7 @@
 
                     // Re-query for the second click
                     closeButtons = document.querySelectorAll('div[role="dialog"] button[aria-label="close"]');
-                    console.log(`Found ${closeButtons.length} close buttons after first click for row ${rowId}`);
+                    log(`Found ${closeButtons.length} close buttons after first click for row ${rowId}`);
                     if (closeButtons.length > 0) {
                         closeButton = closeButtons[0];
                         closeButton.click();
@@ -273,14 +337,17 @@
             }
         }
 
-        console.log('Finished processing all selected rows');
-        console.log('Collected results:', results);
+        log('Finished processing all selected rows');
+        log('Collected results:', results);
 
         // Merge all PDFs into one
         if (results.length > 0) {
             try {
+                // Ensure pdf-lib is loaded
+                await loadPdfLib();
+
                 const mergedPdf = await mergePDFs(results.map(r => r.labels));
-                console.log('Successfully merged PDFs');
+                log('Successfully merged PDFs');
 
                 // Download the merged PDF
                 downloadPDF(mergedPdf, 'merged-labels.pdf');
@@ -337,8 +404,15 @@
         button.disabled = count === 0;
     }
 
+    // Update accept button state
+    function updateAcceptButton(button) {
+        const count = selectedRows.size;
+        button.textContent = `Accept Selected (${count})`;
+        button.disabled = count === 0;
+    }
+
     // Add checkbox to a row
-    function addCheckboxToRow(row, button) {
+    function addCheckboxToRow(row, actionButton, acceptButton) {
         // Skip if checkbox already exists
         if (row.querySelector('.row-selector-checkbox')) return;
 
@@ -365,7 +439,8 @@
                 selectedRows.delete(dataId);
                 row.classList.remove('row-selected');
             }
-            updateActionButton(button);
+            updateActionButton(actionButton);
+            updateAcceptButton(acceptButton);
             updateSelectAllCheckbox();
         });
 
@@ -386,7 +461,7 @@
     }
 
     // Add checkbox to header
-    function addCheckboxToHeader(button) {
+    function addCheckboxToHeader(actionButton, acceptButton) {
         const header = document.querySelector('.MuiDataGrid-columnHeaders');
         if (!header || header.querySelector('.header-selector-checkbox')) return;
 
@@ -421,7 +496,8 @@
                     }
                 }
             });
-            updateActionButton(button);
+            updateActionButton(actionButton);
+            updateAcceptButton(acceptButton);
         });
 
         checkboxCell.appendChild(checkbox);
@@ -454,13 +530,13 @@
     // Initialize
     function init() {
         injectStyles();
-        const { actionButton, toggleButton } = createButtons();
+        const { actionButton, acceptButton, toggleButton } = createButtons();
 
         // Initial setup
         setTimeout(() => {
-            addCheckboxToHeader(actionButton);
+            addCheckboxToHeader(actionButton, acceptButton);
             document.querySelectorAll('.MuiDataGrid-row').forEach(row => {
-                addCheckboxToRow(row, actionButton);
+                addCheckboxToRow(row, actionButton, acceptButton);
             });
         }, 1000);
 
@@ -470,15 +546,15 @@
                 mutation.addedNodes.forEach((node) => {
                     if (node.nodeType === 1) {
                         if (node.classList && node.classList.contains('MuiDataGrid-row')) {
-                            addCheckboxToRow(node, actionButton);
+                            addCheckboxToRow(node, actionButton, acceptButton);
                         }
                         if (node.classList && node.classList.contains('MuiDataGrid-columnHeaders')) {
-                            addCheckboxToHeader(actionButton);
+                            addCheckboxToHeader(actionButton, acceptButton);
                         }
                         // Check children
                         if (node.querySelectorAll) {
                             node.querySelectorAll('.MuiDataGrid-row').forEach(row => {
-                                addCheckboxToRow(row, actionButton);
+                                addCheckboxToRow(row, actionButton, acceptButton);
                             });
                         }
                     }
