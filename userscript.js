@@ -180,23 +180,50 @@
                 if (formButton) {
                     formButton.style.border = '3px solid red';
 
-                    // Intercept blob URL opening
+                    // Intercept blob URL opening and prevent popup
                     const originalOpen = window.open;
                     let blobUrl = null;
+
                     window.open = function(url, ...args) {
+                        console.log('window.open called with:', url, args);
+
+                        // Return a proxy window that intercepts location.href assignment
+                        const fakeWindow = {
+                            closed: false,
+                            location: new Proxy({}, {
+                                set(target, prop, value) {
+                                    console.log(`Intercepted location.${prop} = ${value}`);
+                                    if (prop === 'href' && value && value.startsWith('blob:')) {
+                                        blobUrl = value;
+                                        console.log('Captured blob URL via location.href:', blobUrl);
+                                    }
+                                    target[prop] = value;
+                                    return true;
+                                },
+                                get(target, prop) {
+                                    return target[prop];
+                                }
+                            }),
+                            document: { write: () => {}, close: () => {} },
+                            focus: () => {}
+                        };
+
+                        // Also check if URL is directly a blob
                         if (url && url.startsWith('blob:')) {
                             blobUrl = url;
-                            console.log('Intercepted blob URL:', blobUrl);
-                            return originalOpen.call(this, url, ...args);
+                            console.log('Captured blob URL directly:', blobUrl);
                         }
-                        return originalOpen.call(this, url, ...args);
+
+                        return fakeWindow;
                     };
 
                     formButton.click();
-                    await new Promise(resolve => setTimeout(resolve, 50));
+                    await new Promise(resolve => setTimeout(resolve, 500));
 
                     // Restore original window.open
                     window.open = originalOpen;
+
+                    console.log('Final blobUrl:', blobUrl);
 
                     // Fetch and hash the blob if we captured it
                     if (blobUrl) {
@@ -214,6 +241,8 @@
                         } catch (error) {
                             console.error(`Error processing blob for row ${rowId}:`, error);
                         }
+                    } else {
+                        console.warn(`No blob URL was captured for row ${rowId}`);
                     }
                 } else {
                     console.warn(`Form button not found for row ${rowId}`);
