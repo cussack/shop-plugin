@@ -11,7 +11,7 @@
 // @grant        GM_setValue
 // ==/UserScript==
 
-(function() {
+(function () {
     'use strict';
 
     // Debug mode configuration
@@ -120,9 +120,9 @@
         const container = document.createElement('div');
         container.className = 'button-container';
         container.innerHTML = `
-            <button class="toggle-button">Show Checkboxes</button>
-            <button class="action-button accept-button" disabled>Accept Selected (0)</button>
-            <button class="action-button" disabled>Labels ausdrucken (0)</button>
+            <button class="toggle-button">Auswahlboxen anzeigen</button>
+            <button class="action-button accept-button" disabled>Bestellungen bestätigen (0)</button>
+            <button class="action-button" disabled>Labels ausdrucken & auf in Bearbeitung setzen (0)</button>
         `;
         document.body.appendChild(container);
 
@@ -134,7 +134,7 @@
         acceptButton.addEventListener('click', handleAcceptAction);
         toggleButton.addEventListener('click', () => toggleCheckboxes(toggleButton));
 
-        return { actionButton, acceptButton, toggleButton };
+        return {actionButton, acceptButton, toggleButton};
     }
 
     // Toggle checkboxes visibility
@@ -145,11 +145,11 @@
         if (checkboxesVisible) {
             dataGrid.classList.add('checkboxes-visible');
             toggleButton.classList.add('active');
-            toggleButton.textContent = 'Hide Checkboxes';
+            toggleButton.textContent = 'Auswahlboxen verbergen';
         } else {
             dataGrid.classList.remove('checkboxes-visible');
             toggleButton.classList.remove('active');
-            toggleButton.textContent = 'Show Checkboxes';
+            toggleButton.textContent = 'Auswahlboxen anzeigen';
         }
     }
 
@@ -266,10 +266,10 @@
                 ).singleNodeValue;
                 if (formButton) {
                     // Intercept blob URL opening and prevent popup
-                    const originalOpen = window.open;
+                    const originalOpen = unsafeWindow.open;
                     let blobUrl = null;
 
-                    window.open = function(url, ...args) {
+                    unsafeWindow.open = function (url, ...args) {
                         log('window.open called with:', url, args);
 
                         // Return a proxy window that intercepts location.href assignment
@@ -289,8 +289,13 @@
                                     return target[prop];
                                 }
                             }),
-                            document: { write: () => {}, close: () => {} },
-                            focus: () => {}
+                            document: {
+                                write: () => {
+                                }, close: () => {
+                                }
+                            },
+                            focus: () => {
+                            }
                         };
 
                         // Also check if URL is directly a blob
@@ -303,10 +308,10 @@
                     };
 
                     formButton.click();
-                    await new Promise(resolve => setTimeout(resolve, 500));
+                    await new Promise(resolve => setTimeout(resolve, 50));
 
                     // Restore original window.open
-                    window.open = originalOpen;
+                    unsafeWindow.open = originalOpen;
 
                     log('Final blobUrl:', blobUrl);
 
@@ -401,7 +406,7 @@
                             continue;
                         }
 
-                        statusDropdown.click();
+                        statusDropdown.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));;
                         await new Promise(resolve => setTimeout(resolve, 50));
 
                         // Select "inprocess" option
@@ -414,16 +419,20 @@
                         inprocessOption.click();
                         await new Promise(resolve => setTimeout(resolve, 50));
 
+                        const sendMailCheckbox = document.querySelector('form input[name="sendMailToCustomer"]');
+                        sendMailCheckbox.click();
+                        await new Promise(resolve => setTimeout(resolve, 50));
+
                         // Click the appropriate button based on debug mode
                         const buttonType = debugMode ? 'button' : 'submit';
-                        const formButton = document.querySelector(`div[role="dialog"] form button[type="${buttonType}"]`);
+                        const formButton = document.querySelector(`div[role="dialog"] form button[type="${buttonType}"]:not([aria-label]`);
                         if (!formButton) {
                             console.error(`Form button (${buttonType}) not found for row ${rowId}`);
                             continue;
                         }
 
                         formButton.click();
-                        await new Promise(resolve => setTimeout(resolve, 50));
+                        await new Promise(resolve => setTimeout(resolve, 250));
 
                         log(`Changed status to inprocess for row ${rowId}`);
 
@@ -455,7 +464,7 @@
 
     // Merge multiple PDF blobs into one
     async function mergePDFs(blobs) {
-        const { PDFDocument } = PDFLib;
+        const {PDFDocument} = PDFLib;
 
         // Create a new PDF document
         const mergedPdf = await PDFDocument.create();
@@ -474,20 +483,20 @@
 
         // Save the merged PDF
         const mergedPdfBytes = await mergedPdf.save();
-        return new Blob([mergedPdfBytes], { type: 'application/pdf' });
+        return new Blob([mergedPdfBytes], {type: 'application/pdf'});
     }
 
     // Update action button state
     function updateActionButton(button) {
         const count = selectedRows.size;
-        button.textContent = `Labels ausdrucken (${count})`;
+        button.textContent = `Labels ausdrucken & auf in Bearbeitung setzen (${count})`;
         button.disabled = count === 0;
     }
 
     // Update accept button state
     function updateAcceptButton(button) {
         const count = selectedRows.size;
-        button.textContent = `Accept Selected (${count})`;
+        button.textContent = `Bestellungen bestätigen (${count})`;
         button.disabled = count === 0;
     }
 
@@ -610,7 +619,7 @@
     // Initialize
     function init() {
         injectStyles();
-        const { actionButton, acceptButton, toggleButton } = createButtons();
+        const {actionButton, acceptButton, toggleButton} = createButtons();
 
         // Initial setup
         setTimeout(() => {
