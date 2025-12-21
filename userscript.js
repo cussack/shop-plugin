@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Cannabis Apotheke Row Selector
 // @namespace    http://tampermonkey.net/
-// @version      0.2
+// @version      0.3
 // @description  Add checkboxes to select rows in MUI DataGrid
 // @author       You
 // @match        https://shop.cannabis-apotheke-luebeck.de/account/dashboard
@@ -17,6 +17,10 @@
     // Debug mode configuration
     const DEBUG_MODE_KEY = 'debugMode';
     let debugMode = GM_getValue(DEBUG_MODE_KEY, false);
+
+    // Action buttons visibility configuration
+    const BUTTONS_VISIBLE_KEY = 'actionButtonsVisible';
+    let actionButtonsVisible = GM_getValue(BUTTONS_VISIBLE_KEY, true);
 
     function toggleDebugMode() {
         debugMode = !debugMode;
@@ -78,7 +82,7 @@
             }
             .button-container {
                 position: fixed;
-                bottom: 20px;
+                bottom: 70px;
                 right: 20px;
                 z-index: 9999;
                 display: flex;
@@ -111,6 +115,33 @@
             .toggle-button.active:hover {
                 background-color: #1b5e20;
             }
+            .visibility-toggle {
+                position: fixed;
+                bottom: 20px;
+                right: 80px;
+                z-index: 10000;
+                background-color: #424242;
+                color: white;
+                border: none;
+                padding: 8px 12px;
+                border-radius: 50%;
+                font-size: 18px;
+                cursor: pointer;
+                box-shadow: 0 3px 5px rgba(0,0,0,0.3);
+                transition: all 0.3s;
+                width: 40px;
+                height: 40px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+            .visibility-toggle:hover {
+                background-color: #616161;
+                transform: scale(1.1);
+            }
+            .button-container.hidden {
+                display: none !important;
+            }
         `;
         document.head.appendChild(style);
     }
@@ -135,6 +166,35 @@
         toggleButton.addEventListener('click', () => toggleCheckboxes(toggleButton));
 
         return {actionButton, acceptButton, toggleButton};
+    }
+
+    // Create visibility toggle button
+    function createVisibilityToggle(container) {
+        const visibilityToggle = document.createElement('button');
+        visibilityToggle.className = 'visibility-toggle';
+        visibilityToggle.title = actionButtonsVisible ? 'Buttons verbergen' : 'Buttons anzeigen';
+        visibilityToggle.textContent = actionButtonsVisible ? '×' : '+';
+        document.body.appendChild(visibilityToggle);
+
+        visibilityToggle.addEventListener('click', () => toggleActionButtons(container, visibilityToggle));
+
+        return visibilityToggle;
+    }
+
+    // Toggle action buttons visibility
+    function toggleActionButtons(container, visibilityToggle) {
+        actionButtonsVisible = !actionButtonsVisible;
+        GM_setValue(BUTTONS_VISIBLE_KEY, actionButtonsVisible);
+
+        if (actionButtonsVisible) {
+            container.classList.remove('hidden');
+            visibilityToggle.textContent = '×';
+            visibilityToggle.title = 'Buttons verbergen';
+        } else {
+            container.classList.add('hidden');
+            visibilityToggle.textContent = '+';
+            visibilityToggle.title = 'Buttons anzeigen';
+        }
     }
 
     // Toggle checkboxes visibility
@@ -620,6 +680,17 @@
     function init() {
         injectStyles();
         const {actionButton, acceptButton, toggleButton} = createButtons();
+
+        // Get the button container
+        const buttonContainer = document.querySelector('.button-container');
+
+        // Apply initial visibility state
+        if (!actionButtonsVisible) {
+            buttonContainer.classList.add('hidden');
+        }
+
+        // Create visibility toggle button
+        createVisibilityToggle(buttonContainer);
 
         // Initial setup
         setTimeout(() => {
