@@ -167,8 +167,30 @@
                     continue;
                 }
 
-                // TODO: Implement acceptance logic here
-                log(`Processing acceptance for row ${rowId}`);
+                // Find and click the reservation button
+                const reservationButton = row.querySelector('div[data-field="reservation"] div[role="button"]');
+                if (!reservationButton) {
+                    console.error(`Reservation button not found for row ${rowId}`);
+                    continue;
+                }
+
+                reservationButton.click();
+                await new Promise(resolve => setTimeout(resolve, 50));
+
+                log(`Clicked reservation button for row ${rowId}`);
+
+                // Click the appropriate button based on debug mode
+                const buttonType = debugMode ? 'button' : 'submit';
+                const formButton = document.querySelector(`div[role="dialog"] form button[type="${buttonType}"]:not([aria-label]`);
+                if (!formButton) {
+                    console.error(`Form button (${buttonType}) not found for row ${rowId}`);
+                    continue;
+                }
+
+                formButton.click();
+                await new Promise(resolve => setTimeout(resolve, 50));
+
+                log(`Clicked form ${buttonType} button for row ${rowId}`);
 
             } catch (error) {
                 console.error(`Error accepting row ${rowId}:`, error);
@@ -351,6 +373,64 @@
 
                 // Download the merged PDF
                 downloadPDF(mergedPdf, 'merged-labels.pdf');
+
+                // Change status of all processed rows to "inprocess"
+                log('Changing status of processed rows to inprocess');
+                for (const rowId of selectedIds) {
+                    try {
+                        const row = document.querySelector(`.MuiDataGrid-row[data-id="${rowId}"]`);
+                        if (!row) {
+                            console.error(`Row with ID ${rowId} not found for status update`);
+                            continue;
+                        }
+
+                        // Find and click the reservation button
+                        const reservationButton = row.querySelector('div[data-field="reservation"] div[role="button"]');
+                        if (!reservationButton) {
+                            console.error(`Reservation button not found for row ${rowId}`);
+                            continue;
+                        }
+
+                        reservationButton.click();
+                        await new Promise(resolve => setTimeout(resolve, 50));
+
+                        // Click the status dropdown
+                        const statusDropdown = document.querySelector('#status');
+                        if (!statusDropdown) {
+                            console.error(`Status dropdown not found for row ${rowId}`);
+                            continue;
+                        }
+
+                        statusDropdown.click();
+                        await new Promise(resolve => setTimeout(resolve, 50));
+
+                        // Select "inprocess" option
+                        const inprocessOption = document.querySelector('#menu-status ul li[data-value="inprocess"]');
+                        if (!inprocessOption) {
+                            console.error(`Inprocess option not found for row ${rowId}`);
+                            continue;
+                        }
+
+                        inprocessOption.click();
+                        await new Promise(resolve => setTimeout(resolve, 50));
+
+                        // Click the appropriate button based on debug mode
+                        const buttonType = debugMode ? 'button' : 'submit';
+                        const formButton = document.querySelector(`div[role="dialog"] form button[type="${buttonType}"]`);
+                        if (!formButton) {
+                            console.error(`Form button (${buttonType}) not found for row ${rowId}`);
+                            continue;
+                        }
+
+                        formButton.click();
+                        await new Promise(resolve => setTimeout(resolve, 50));
+
+                        log(`Changed status to inprocess for row ${rowId}`);
+
+                    } catch (error) {
+                        console.error(`Error changing status for row ${rowId}:`, error);
+                    }
+                }
 
                 return mergedPdf;
             } catch (error) {
