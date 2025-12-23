@@ -154,21 +154,24 @@
             <button class="toggle-button">Auswahlboxen anzeigen</button>
             <button class="action-button accept-button" disabled>Bestellungen bestätigen (0)</button>
             <button class="action-button print-labels-button" disabled>Labels ausdrucken & auf in Bearbeitung setzen (0)</button>
+            <button class="action-button download-protocols-button" disabled>Protokolle erzeugen (0)</button>
             <button class="action-button ready-for-pickup-button" disabled>Auf abholbereit setzen & Mail versenden (0)</button>
         `;
         document.body.appendChild(container);
 
         const acceptButton = container.querySelector('.accept-button');
         const printLabelsButton = container.querySelector('.print-labels-button');
+        const downloadProtocolsButton = container.querySelector('.download-protocols-button');
         const readyForPickupButton = container.querySelector('.ready-for-pickup-button');
         const toggleButton = container.querySelector('.toggle-button');
 
         acceptButton.addEventListener('click', handleAcceptAction);
         printLabelsButton.addEventListener('click', handlePrintLabelsAction);
+        downloadProtocolsButton.addEventListener('click', handleDownloadProtocolsAction);
         readyForPickupButton.addEventListener('click', handleReadyForPickupAction);
         toggleButton.addEventListener('click', () => toggleCheckboxes(toggleButton));
 
-        return {acceptButton, printLabelsButton, readyForPickupButton, toggleButton};
+        return {acceptButton, printLabelsButton, downloadProtocolsButton, readyForPickupButton, toggleButton};
     }
 
     // Create visibility toggle button
@@ -328,6 +331,105 @@
         }
 
         log('Finished setting all selected rows to pickupready');
+    }
+
+    // Handle download protocols button click
+    async function handleDownloadProtocolsAction() {
+        const selectedIds = Array.from(selectedRows);
+        log('Downloading protocols for row IDs:', selectedIds);
+
+        for (const rowId of selectedIds) {
+            try {
+                // Find the row
+                const row = document.querySelector(`.MuiDataGrid-row[data-id="${rowId}"]`);
+                if (!row) {
+                    console.error(`Row with ID ${rowId} not found`);
+                    continue;
+                }
+
+                // Find and click the delivery button
+                const deliveryButton = row.querySelector('div[data-field="delivery"] div[role="button"]');
+                if (!deliveryButton) {
+                    console.error(`Delivery button not found for row ${rowId}`);
+                    continue;
+                }
+
+                deliveryButton.click();
+                await new Promise(resolve => setTimeout(resolve, 50));
+
+                // Find and click the button in the modal
+                const modal = document.querySelector('div[aria-modal="true"]');
+                if (!modal) {
+                    console.error(`Modal not opened for row ${rowId}`);
+                    continue;
+                }
+
+                const modalButton = modal.querySelector('thead th button');
+                if (!modalButton) {
+                    console.error(`Modal button not found for row ${rowId}`);
+                    continue;
+                }
+
+                // Wait for modal button to be enabled
+                let attempts = 0;
+                while (modalButton.disabled && attempts < 100) {
+                    await new Promise(resolve => setTimeout(resolve, 50));
+                    attempts++;
+                }
+
+                if (modalButton.disabled) {
+                    console.error(`Modal button never enabled for row ${rowId}`);
+                    continue;
+                }
+
+                log(`Modal button enabled after ${attempts * 50}ms for row ${rowId}`);
+
+                modalButton.click();
+                await new Promise(resolve => setTimeout(resolve, 50));
+
+                // Find and click the form button to open blob URL
+                const formButton = document.evaluate(
+                    '//button[text()="Protokoll erzeugen"]',
+                    document,
+                    null,
+                    XPathResult.FIRST_ORDERED_NODE_TYPE,
+                    null
+                ).singleNodeValue;
+                if (formButton) {
+                    formButton.click();
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                } else {
+                    console.warn(`Form button not found for row ${rowId}`);
+                }
+
+                // Find and click the close button twice
+                let closeButtons = document.querySelectorAll('button[aria-label="close"]');
+                log(`Found ${closeButtons.length} close buttons for row ${rowId}`);
+                if (closeButtons.length > 0) {
+                    // Get the innermost (last) close button
+                    let closeButton = closeButtons[closeButtons.length - 1];
+
+                    closeButton.click();
+                    await new Promise(resolve => setTimeout(resolve, 50));
+
+                    // Re-query for the second click
+                    closeButtons = document.querySelectorAll('div[role="dialog"] button[aria-label="close"]');
+                    log(`Found ${closeButtons.length} close buttons after first click for row ${rowId}`);
+                    if (closeButtons.length > 0) {
+                        closeButton = closeButtons[0];
+                        closeButton.click();
+                        await new Promise(resolve => setTimeout(resolve, 50));
+                    }
+                } else {
+                    console.warn(`Close button not found for row ${rowId}`);
+                }
+
+            } catch (error) {
+                console.error(`Error processing row ${rowId}:`, error);
+            }
+        }
+
+        log('Finished downloading protocols for all selected rows');
     }
 
     // Handle action button click
@@ -630,6 +732,13 @@
         button.disabled = count === 0;
     }
 
+    // Update download protocols button state
+    function updateDownloadProtocolsButton(button) {
+        const count = selectedRows.size;
+        button.textContent = `Protokolle erzeugen (${count})`;
+        button.disabled = count === 0;
+    }
+
     // Update ready for pickup button state
     function updateReadyForPickupButton(button) {
         const count = selectedRows.size;
@@ -638,7 +747,7 @@
     }
 
     // Add checkbox to a row
-    function addCheckboxToRow(row, acceptButton, printLabelsButton, readyForPickupButton) {
+    function addCheckboxToRow(row, acceptButton, printLabelsButton, downloadProtocolsButton, readyForPickupButton) {
         // Skip if checkbox already exists
         if (row.querySelector('.row-selector-checkbox')) return;
 
@@ -667,6 +776,7 @@
             }
             updateAcceptButton(acceptButton);
             updatePrintLabelsButton(printLabelsButton);
+            updateDownloadProtocolsButton(downloadProtocolsButton);
             updateReadyForPickupButton(readyForPickupButton);
             updateSelectAllCheckbox();
         });
@@ -688,7 +798,7 @@
     }
 
     // Add checkbox to header
-    function addCheckboxToHeader(acceptButton, printLabelsButton, readyForPickupButton) {
+    function addCheckboxToHeader(acceptButton, printLabelsButton, downloadProtocolsButton, readyForPickupButton) {
         const header = document.querySelector('.MuiDataGrid-columnHeaders');
         if (!header || header.querySelector('.header-selector-checkbox')) return;
 
@@ -725,6 +835,7 @@
             });
             updateAcceptButton(acceptButton);
             updatePrintLabelsButton(printLabelsButton);
+            updateDownloadProtocolsButton(downloadProtocolsButton);
             updateReadyForPickupButton(readyForPickupButton);
         });
 
@@ -758,7 +869,7 @@
     // Initialize
     function init() {
         injectStyles();
-        const {acceptButton, printLabelsButton, readyForPickupButton, toggleButton} = createButtons();
+        const {acceptButton, printLabelsButton, downloadProtocolsButton, readyForPickupButton, toggleButton} = createButtons();
 
         // Get the button container
         const buttonContainer = document.querySelector('.button-container');
@@ -773,9 +884,9 @@
 
         // Initial setup
         setTimeout(() => {
-            addCheckboxToHeader(acceptButton, printLabelsButton, readyForPickupButton);
+            addCheckboxToHeader(acceptButton, printLabelsButton, downloadProtocolsButton, readyForPickupButton);
             document.querySelectorAll('.MuiDataGrid-row').forEach(row => {
-                addCheckboxToRow(row, acceptButton, printLabelsButton, readyForPickupButton);
+                addCheckboxToRow(row, acceptButton, printLabelsButton, downloadProtocolsButton, readyForPickupButton);
             });
         }, 1000);
 
@@ -785,15 +896,15 @@
                 mutation.addedNodes.forEach((node) => {
                     if (node.nodeType === 1) {
                         if (node.classList && node.classList.contains('MuiDataGrid-row')) {
-                            addCheckboxToRow(node, acceptButton, printLabelsButton, readyForPickupButton);
+                            addCheckboxToRow(node, acceptButton, printLabelsButton, downloadProtocolsButton, readyForPickupButton);
                         }
                         if (node.classList && node.classList.contains('MuiDataGrid-columnHeaders')) {
-                            addCheckboxToHeader(acceptButton, printLabelsButton, readyForPickupButton);
+                            addCheckboxToHeader(acceptButton, printLabelsButton, downloadProtocolsButton, readyForPickupButton);
                         }
                         // Check children
                         if (node.querySelectorAll) {
                             node.querySelectorAll('.MuiDataGrid-row').forEach(row => {
-                                addCheckboxToRow(row, acceptButton, printLabelsButton, readyForPickupButton);
+                                addCheckboxToRow(row, acceptButton, printLabelsButton, downloadProtocolsButton, readyForPickupButton);
                             });
                         }
                     }
