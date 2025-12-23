@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Cannabis Apotheke Row Selector
 // @namespace    http://tampermonkey.net/
-// @version      0.5
+// @version      0.6
 // @description  Add checkboxes to select rows in MUI DataGrid
 // @author       You
 // @match        https://shop.cannabis-apotheke-luebeck.de/account/dashboard
@@ -154,18 +154,21 @@
             <button class="toggle-button">Auswahlboxen anzeigen</button>
             <button class="action-button accept-button" disabled>Bestellungen bestätigen (0)</button>
             <button class="action-button" disabled>Labels ausdrucken & auf in Bearbeitung setzen (0)</button>
+            <button class="action-button ready-for-pickup-button" disabled>Auf abholbereit setzen & Mail versenden (0)</button>
         `;
         document.body.appendChild(container);
 
-        const actionButton = container.querySelector('.action-button:not(.accept-button)');
+        const actionButton = container.querySelector('.action-button:not(.accept-button):not(.ready-for-pickup-button)');
         const acceptButton = container.querySelector('.accept-button');
+        const readyForPickupButton = container.querySelector('.ready-for-pickup-button');
         const toggleButton = container.querySelector('.toggle-button');
 
         actionButton.addEventListener('click', handleAction);
         acceptButton.addEventListener('click', handleAcceptAction);
+        readyForPickupButton.addEventListener('click', handleReadyForPickupAction);
         toggleButton.addEventListener('click', () => toggleCheckboxes(toggleButton));
 
-        return {actionButton, acceptButton, toggleButton};
+        return {actionButton, acceptButton, readyForPickupButton, toggleButton};
     }
 
     // Create visibility toggle button
@@ -258,6 +261,73 @@
         }
 
         log('Finished accepting all selected rows');
+    }
+
+    // Handle ready for pickup button click
+    async function handleReadyForPickupAction() {
+        const selectedIds = Array.from(selectedRows);
+        log('Setting rows to pickupready, row IDs:', selectedIds);
+
+        for (const rowId of selectedIds) {
+            try {
+                // Find the row
+                const row = document.querySelector(`.MuiDataGrid-row[data-id="${rowId}"]`);
+                if (!row) {
+                    console.error(`Row with ID ${rowId} not found`);
+                    continue;
+                }
+
+                // Find and click the reservation button
+                const reservationButton = row.querySelector('div[data-field="reservation"] div[role="button"]');
+                if (!reservationButton) {
+                    console.error(`Reservation button not found for row ${rowId}`);
+                    continue;
+                }
+
+                reservationButton.click();
+                await new Promise(resolve => setTimeout(resolve, 50));
+
+                log(`Clicked reservation button for row ${rowId}`);
+
+                // Click the status dropdown
+                const statusDropdown = document.querySelector('#status');
+                if (!statusDropdown) {
+                    console.error(`Status dropdown not found for row ${rowId}`);
+                    continue;
+                }
+
+                statusDropdown.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+                await new Promise(resolve => setTimeout(resolve, 50));
+
+                // Select "pickupready" option
+                const pickupreadyOption = document.querySelector('#menu-status ul li[data-value="pickupready"]');
+                if (!pickupreadyOption) {
+                    console.error(`Pickupready option not found for row ${rowId}`);
+                    continue;
+                }
+
+                pickupreadyOption.click();
+                await new Promise(resolve => setTimeout(resolve, 50));
+
+                // Click the appropriate button based on debug mode
+                const buttonType = debugMode ? 'button' : 'submit';
+                const formButton = document.querySelector(`div[role="dialog"] form button[type="${buttonType}"]:not([aria-label]`);
+                if (!formButton) {
+                    console.error(`Form button (${buttonType}) not found for row ${rowId}`);
+                    continue;
+                }
+
+                formButton.click();
+                await new Promise(resolve => setTimeout(resolve, 250));
+
+                log(`Changed status to pickupready for row ${rowId}`);
+
+            } catch (error) {
+                console.error(`Error setting row ${rowId} to pickupready:`, error);
+            }
+        }
+
+        log('Finished setting all selected rows to pickupready');
     }
 
     // Handle action button click
@@ -560,8 +630,15 @@
         button.disabled = count === 0;
     }
 
+    // Update ready for pickup button state
+    function updateReadyForPickupButton(button) {
+        const count = selectedRows.size;
+        button.textContent = `Auf abholbereit setzen & Mail versenden (${count})`;
+        button.disabled = count === 0;
+    }
+
     // Add checkbox to a row
-    function addCheckboxToRow(row, actionButton, acceptButton) {
+    function addCheckboxToRow(row, actionButton, acceptButton, readyForPickupButton) {
         // Skip if checkbox already exists
         if (row.querySelector('.row-selector-checkbox')) return;
 
@@ -590,6 +667,7 @@
             }
             updateActionButton(actionButton);
             updateAcceptButton(acceptButton);
+            updateReadyForPickupButton(readyForPickupButton);
             updateSelectAllCheckbox();
         });
 
@@ -610,7 +688,7 @@
     }
 
     // Add checkbox to header
-    function addCheckboxToHeader(actionButton, acceptButton) {
+    function addCheckboxToHeader(actionButton, acceptButton, readyForPickupButton) {
         const header = document.querySelector('.MuiDataGrid-columnHeaders');
         if (!header || header.querySelector('.header-selector-checkbox')) return;
 
@@ -647,6 +725,7 @@
             });
             updateActionButton(actionButton);
             updateAcceptButton(acceptButton);
+            updateReadyForPickupButton(readyForPickupButton);
         });
 
         checkboxCell.appendChild(checkbox);
@@ -679,7 +758,7 @@
     // Initialize
     function init() {
         injectStyles();
-        const {actionButton, acceptButton, toggleButton} = createButtons();
+        const {actionButton, acceptButton, readyForPickupButton, toggleButton} = createButtons();
 
         // Get the button container
         const buttonContainer = document.querySelector('.button-container');
@@ -694,9 +773,9 @@
 
         // Initial setup
         setTimeout(() => {
-            addCheckboxToHeader(actionButton, acceptButton);
+            addCheckboxToHeader(actionButton, acceptButton, readyForPickupButton);
             document.querySelectorAll('.MuiDataGrid-row').forEach(row => {
-                addCheckboxToRow(row, actionButton, acceptButton);
+                addCheckboxToRow(row, actionButton, acceptButton, readyForPickupButton);
             });
         }, 1000);
 
@@ -706,15 +785,15 @@
                 mutation.addedNodes.forEach((node) => {
                     if (node.nodeType === 1) {
                         if (node.classList && node.classList.contains('MuiDataGrid-row')) {
-                            addCheckboxToRow(node, actionButton, acceptButton);
+                            addCheckboxToRow(node, actionButton, acceptButton, readyForPickupButton);
                         }
                         if (node.classList && node.classList.contains('MuiDataGrid-columnHeaders')) {
-                            addCheckboxToHeader(actionButton, acceptButton);
+                            addCheckboxToHeader(actionButton, acceptButton, readyForPickupButton);
                         }
                         // Check children
                         if (node.querySelectorAll) {
                             node.querySelectorAll('.MuiDataGrid-row').forEach(row => {
-                                addCheckboxToRow(row, actionButton, acceptButton);
+                                addCheckboxToRow(row, actionButton, acceptButton, readyForPickupButton);
                             });
                         }
                     }
