@@ -153,22 +153,22 @@
         container.innerHTML = `
             <button class="toggle-button">Auswahlboxen anzeigen</button>
             <button class="action-button accept-button" disabled>Bestellungen bestätigen (0)</button>
-            <button class="action-button" disabled>Labels ausdrucken & auf in Bearbeitung setzen (0)</button>
+            <button class="action-button print-labels-button" disabled>Labels ausdrucken & auf in Bearbeitung setzen (0)</button>
             <button class="action-button ready-for-pickup-button" disabled>Auf abholbereit setzen & Mail versenden (0)</button>
         `;
         document.body.appendChild(container);
 
-        const actionButton = container.querySelector('.action-button:not(.accept-button):not(.ready-for-pickup-button)');
         const acceptButton = container.querySelector('.accept-button');
+        const printLabelsButton = container.querySelector('.print-labels-button');
         const readyForPickupButton = container.querySelector('.ready-for-pickup-button');
         const toggleButton = container.querySelector('.toggle-button');
 
-        actionButton.addEventListener('click', handleAction);
         acceptButton.addEventListener('click', handleAcceptAction);
+        printLabelsButton.addEventListener('click', handlePrintLabelsAction);
         readyForPickupButton.addEventListener('click', handleReadyForPickupAction);
         toggleButton.addEventListener('click', () => toggleCheckboxes(toggleButton));
 
-        return {actionButton, acceptButton, readyForPickupButton, toggleButton};
+        return {acceptButton, printLabelsButton, readyForPickupButton, toggleButton};
     }
 
     // Create visibility toggle button
@@ -331,7 +331,7 @@
     }
 
     // Handle action button click
-    async function handleAction() {
+    async function handlePrintLabelsAction() {
         const selectedIds = Array.from(selectedRows);
         log('Processing labels for row IDs:', selectedIds);
 
@@ -616,17 +616,17 @@
         return new Blob([mergedPdfBytes], {type: 'application/pdf'});
     }
 
-    // Update action button state
-    function updateActionButton(button) {
-        const count = selectedRows.size;
-        button.textContent = `Labels ausdrucken & auf in Bearbeitung setzen (${count})`;
-        button.disabled = count === 0;
-    }
-
     // Update accept button state
     function updateAcceptButton(button) {
         const count = selectedRows.size;
         button.textContent = `Bestellungen bestätigen (${count})`;
+        button.disabled = count === 0;
+    }
+
+    // Update print labels button state
+    function updatePrintLabelsButton(button) {
+        const count = selectedRows.size;
+        button.textContent = `Labels ausdrucken & auf in Bearbeitung setzen (${count})`;
         button.disabled = count === 0;
     }
 
@@ -638,7 +638,7 @@
     }
 
     // Add checkbox to a row
-    function addCheckboxToRow(row, actionButton, acceptButton, readyForPickupButton) {
+    function addCheckboxToRow(row, acceptButton, printLabelsButton, readyForPickupButton) {
         // Skip if checkbox already exists
         if (row.querySelector('.row-selector-checkbox')) return;
 
@@ -665,8 +665,8 @@
                 selectedRows.delete(dataId);
                 row.classList.remove('row-selected');
             }
-            updateActionButton(actionButton);
             updateAcceptButton(acceptButton);
+            updatePrintLabelsButton(printLabelsButton);
             updateReadyForPickupButton(readyForPickupButton);
             updateSelectAllCheckbox();
         });
@@ -688,7 +688,7 @@
     }
 
     // Add checkbox to header
-    function addCheckboxToHeader(actionButton, acceptButton, readyForPickupButton) {
+    function addCheckboxToHeader(acceptButton, printLabelsButton, readyForPickupButton) {
         const header = document.querySelector('.MuiDataGrid-columnHeaders');
         if (!header || header.querySelector('.header-selector-checkbox')) return;
 
@@ -723,8 +723,8 @@
                     }
                 }
             });
-            updateActionButton(actionButton);
             updateAcceptButton(acceptButton);
+            updatePrintLabelsButton(printLabelsButton);
             updateReadyForPickupButton(readyForPickupButton);
         });
 
@@ -758,7 +758,7 @@
     // Initialize
     function init() {
         injectStyles();
-        const {actionButton, acceptButton, readyForPickupButton, toggleButton} = createButtons();
+        const {acceptButton, printLabelsButton, readyForPickupButton, toggleButton} = createButtons();
 
         // Get the button container
         const buttonContainer = document.querySelector('.button-container');
@@ -773,9 +773,9 @@
 
         // Initial setup
         setTimeout(() => {
-            addCheckboxToHeader(actionButton, acceptButton, readyForPickupButton);
+            addCheckboxToHeader(acceptButton, printLabelsButton, readyForPickupButton);
             document.querySelectorAll('.MuiDataGrid-row').forEach(row => {
-                addCheckboxToRow(row, actionButton, acceptButton, readyForPickupButton);
+                addCheckboxToRow(row, acceptButton, printLabelsButton, readyForPickupButton);
             });
         }, 1000);
 
@@ -785,15 +785,15 @@
                 mutation.addedNodes.forEach((node) => {
                     if (node.nodeType === 1) {
                         if (node.classList && node.classList.contains('MuiDataGrid-row')) {
-                            addCheckboxToRow(node, actionButton, acceptButton, readyForPickupButton);
+                            addCheckboxToRow(node, acceptButton, printLabelsButton, readyForPickupButton);
                         }
                         if (node.classList && node.classList.contains('MuiDataGrid-columnHeaders')) {
-                            addCheckboxToHeader(actionButton, acceptButton, readyForPickupButton);
+                            addCheckboxToHeader(acceptButton, printLabelsButton, readyForPickupButton);
                         }
                         // Check children
                         if (node.querySelectorAll) {
                             node.querySelectorAll('.MuiDataGrid-row').forEach(row => {
-                                addCheckboxToRow(row, actionButton, acceptButton, readyForPickupButton);
+                                addCheckboxToRow(row, acceptButton, printLabelsButton, readyForPickupButton);
                             });
                         }
                     }
