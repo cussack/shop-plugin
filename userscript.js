@@ -387,6 +387,48 @@
                 modalButton.click();
                 await new Promise(resolve => setTimeout(resolve, 50));
 
+                // Loop over all amount fields and update is_amount fields
+                let productIndex = 0;
+                while (true) {
+                    const amountField = document.querySelector(`input[name="products.${productIndex}.amount"]`);
+                    if (!amountField) {
+                        break; // No more products
+                    }
+
+                    // Read the current value
+                    const currentValue = parseFloat(amountField.value);
+                    if (!isNaN(currentValue)) {
+                        // Increase by random value between 0 and 5%
+                        const randomPercentage = Math.random() * 0.05; // 0 to 5%
+                        const increasedValue = currentValue * (1 + randomPercentage);
+
+                        // Round to 2 decimal digits
+                        const roundedValue = Math.round(increasedValue * 100) / 100;
+
+                        // Set in corresponding is_amount field
+                        const isAmountField = document.querySelector(`input[name="products.${productIndex}.is_amount"]`);
+                        if (isAmountField) {
+                            // Update the value and trigger React events for MUI controlled input
+                            const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+                            nativeInputValueSetter.call(isAmountField, roundedValue.toFixed(2));
+
+                            // Trigger input event for React to detect the change
+                            const inputEvent = new Event('input', { bubbles: true });
+                            isAmountField.dispatchEvent(inputEvent);
+
+                            // Trigger change event as well
+                            const changeEvent = new Event('change', { bubbles: true });
+                            isAmountField.dispatchEvent(changeEvent);
+
+                            log(`Set products.${productIndex}.is_amount to ${roundedValue.toFixed(2)} (from ${currentValue})`);
+                        } else {
+                            console.warn(`is_amount field not found for product ${productIndex}`);
+                        }
+                    }
+
+                    productIndex++;
+                }
+
                 // Find and click the form button to open blob URL
                 const formButton = document.evaluate(
                     '//button[text()="Protokoll erzeugen"]',
