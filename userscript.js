@@ -426,6 +426,37 @@
                         }
                     }
 
+                    // Open the packaging selectbox
+                    const packageSelectBox = document.querySelector(`div[name="products.${productIndex}.packagename"] > div > div`);
+                    if (packageSelectBox) {
+                        // Open the MUI select by dispatching mousedown event
+                        packageSelectBox.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+                        await new Promise(resolve => setTimeout(resolve, 50));
+                        log(`Opened package select for product ${productIndex}`);
+
+                        // Select the appropriate option based on currentValue
+                        const listItems = document.querySelectorAll('ul[role="listbox"] li');
+                        if (listItems.length >= 3) {
+                            let selectedItem;
+                            if (currentValue <= 10) {
+                                selectedItem = listItems[0];
+                                log(`Selecting first option for product ${productIndex} (currentValue: ${currentValue})`);
+                            } else if (currentValue <= 25) {
+                                selectedItem = listItems[1];
+                                log(`Selecting second option for product ${productIndex} (currentValue: ${currentValue})`);
+                            } else {
+                                selectedItem = listItems[2];
+                                log(`Selecting third option for product ${productIndex} (currentValue: ${currentValue})`);
+                            }
+                            selectedItem.click();
+                            await new Promise(resolve => setTimeout(resolve, 50));
+                        } else {
+                            console.warn(`Expected 3 list items, found ${listItems.length} for product ${productIndex}`);
+                        }
+                    } else {
+                        console.warn(`Package select not found for product ${productIndex}`);
+                    }
+
                     productIndex++;
                 }
 
