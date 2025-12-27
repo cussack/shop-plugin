@@ -460,6 +460,27 @@
                     productIndex++;
                 }
 
+                // Select the acting person
+                const workerSelectBox = document.querySelector('div[name="worker"] > div > div');
+                if (workerSelectBox) {
+                    workerSelectBox.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+                    await new Promise(resolve => setTimeout(resolve, 50));
+
+                    // Pick one of the first four options randomly
+                    const workerOptions = document.querySelectorAll('ul[role="listbox"] li');
+                    if (workerOptions.length >= 1) {
+                        const maxIndex = Math.min(4, workerOptions.length);
+                        const randomIndex = Math.floor(Math.random() * maxIndex);
+                        workerOptions[randomIndex].click();
+                        await new Promise(resolve => setTimeout(resolve, 50));
+                        log(`Selected worker option ${randomIndex} for row ${rowId}`);
+                    } else {
+                        console.warn(`No worker options found for row ${rowId}`);
+                    }
+                } else {
+                    console.warn(`Worker select not found for row ${rowId}`);
+                }
+
                 // Find and click the form button to open blob URL
                 const formButton = document.evaluate(
                     '//button[text()="Protokoll erzeugen"]',
