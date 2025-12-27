@@ -9,6 +9,7 @@
 // @grant        GM_registerMenuCommand
 // @grant        GM_getValue
 // @grant        GM_setValue
+// @grant        GM_download
 // ==/UserScript==
 
 (function () {
@@ -481,7 +482,7 @@
                     console.warn(`Worker select not found for row ${rowId}`);
                 }
 
-                // Find and click the form button to open blob URL
+                // Find and click the form button to download protocol
                 const formButton = document.evaluate(
                     '//button[text()="Protokoll erzeugen"]',
                     document,
@@ -490,8 +491,80 @@
                     null
                 ).singleNodeValue;
                 if (formButton) {
+                    // Intercept blob URL opening
+                    const originalOpen = unsafeWindow.open;
+                    let blobUrl = null;
+
+                    unsafeWindow.open = function (url, ...args) {
+                        log('window.open called with:', url, args);
+
+                        // Return a proxy window that intercepts location.href assignment
+                        const fakeWindow = {
+                            closed: false,
+                            location: new Proxy({}, {
+                                set(target, prop, value) {
+                                    log(`Intercepted location.${prop} = ${value}`);
+                                    if (prop === 'href' && value && value.startsWith('blob:')) {
+                                        blobUrl = value;
+                                        log('Captured blob URL via location.href:', blobUrl);
+                                    }
+                                    target[prop] = value;
+                                    return true;
+                                },
+                                get(target, prop) {
+                                    return target[prop];
+                                }
+                            }),
+                            document: {
+                                write: () => {},
+                                close: () => {}
+                            },
+                            focus: () => {}
+                        };
+
+                        // Also check if URL is directly a blob
+                        if (url && url.startsWith('blob:')) {
+                            blobUrl = url;
+                            log('Captured blob URL directly:', blobUrl);
+                        }
+
+                        return fakeWindow;
+                    };
+
                     formButton.click();
                     await new Promise(resolve => setTimeout(resolve, 500));
+
+                    // Restore original window.open
+                    unsafeWindow.open = originalOpen;
+
+                    log('Final blobUrl:', blobUrl);
+
+                    // Download the blob if we captured it
+                    if (blobUrl) {
+                        try {
+                            // Generate filename with timestamp and row ID
+                            const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+                            const filename = `Protokoll_${rowId}_${timestamp}.pdf`;
+                            const savePath = `C:\\Users\\xtwin\\Desktop\\Cannabis Protokolle\\${filename}`;
+
+                            // Download using GM_download
+                            GM_download({
+                                url: blobUrl,
+                                name: savePath,
+                                saveAs: false,
+                                onload: () => {
+                                    log(`Successfully downloaded protocol for row ${rowId} to ${savePath}`);
+                                },
+                                onerror: (error) => {
+                                    console.error(`Error downloading protocol for row ${rowId}:`, error);
+                                }
+                            });
+                        } catch (error) {
+                            console.error(`Error processing blob for row ${rowId}:`, error);
+                        }
+                    } else {
+                        console.warn(`No blob URL was captured for row ${rowId}`);
+                    }
                 } else {
                     console.warn(`Form button not found for row ${rowId}`);
                 }
