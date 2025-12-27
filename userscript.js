@@ -398,9 +398,9 @@
                     // Read the current value
                     const currentValue = parseFloat(amountField.value);
                     if (!isNaN(currentValue)) {
-                        // Increase by random value between 0 and 5%
-                        const randomPercentage = Math.random() * 0.05; // 0 to 5%
-                        const increasedValue = currentValue * (1 + randomPercentage);
+                        // Add random value between 0 and 0.2
+                        const randomValue = Math.random() * 0.2;
+                        const increasedValue = currentValue + randomValue;
 
                         // Round to 2 decimal digits
                         const roundedValue = Math.round(increasedValue * 100) / 100;
