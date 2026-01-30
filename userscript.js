@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Cannabis Apotheke Row Selector
 // @namespace    http://tampermonkey.net/
-// @version      1.2
+// @version      1.3
 // @description  Add checkboxes to select rows in MUI DataGrid
 // @author       You
 // @match        https://shop.cannabis-apotheke-luebeck.de/account/dashboard
@@ -10,6 +10,7 @@
 // @grant        GM_getValue
 // @grant        GM_setValue
 // @grant        GM_download
+// @require      https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js
 // ==/UserScript==
 
 (function () {
@@ -38,20 +39,9 @@
     // Register menu command for debug mode toggle
     GM_registerMenuCommand(debugMode ? '✓ Debug Mode' : 'Debug Mode', toggleDebugMode);
 
-    // Load pdf-lib dynamically
+    // pdf-lib is loaded via @require, returns the PDFLib global
     function loadPdfLib() {
-        return new Promise((resolve, reject) => {
-            if (window.PDFLib) {
-                resolve(window.PDFLib);
-                return;
-            }
-
-            const script = document.createElement('script');
-            script.src = 'https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js';
-            script.onload = () => resolve(window.PDFLib);
-            script.onerror = () => reject(new Error('Failed to load pdf-lib'));
-            document.head.appendChild(script);
-        });
+        return Promise.resolve(PDFLib);
     }
 
     const selectedRows = new Set();
