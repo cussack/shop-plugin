@@ -653,104 +653,79 @@
                 log(`Modal button enabled after ${attempts * 50}ms for row ${rowId}`);
 
                 modalButton.click();
-                await new Promise(resolve => setTimeout(resolve, 50));
+                await new Promise(resolve => setTimeout(resolve, 150));
 
                 // Find and click the form button to open blob URL
                 const formButton = document.evaluate(
-                    '//button[text()="Label erzeugen"]',
+                    '//button[text()="Etikett erzeugen"]',
                     document,
                     null,
                     XPathResult.FIRST_ORDERED_NODE_TYPE,
                     null
                 ).singleNodeValue;
                 if (formButton) {
-                    // Intercept blob URL opening and prevent popup
+                    // Intercept blob creation and window.open to capture PDF blob directly
                     const originalOpen = unsafeWindow.open;
-                    let blobUrl = null;
+                    const originalCreateObjectURL = unsafeWindow.URL.createObjectURL;
+                    let capturedBlob = null;
 
+                    // Intercept URL.createObjectURL to capture the blob directly
+                    unsafeWindow.URL.createObjectURL = function (blob) {
+                        log('URL.createObjectURL called with:', blob);
+                        if (blob instanceof Blob && blob.type === 'application/pdf') {
+                            capturedBlob = blob;
+                            log('Captured PDF blob directly:', blob.size, 'bytes');
+                        }
+                        return originalCreateObjectURL.call(unsafeWindow.URL, blob);
+                    };
+
+                    // Intercept window.open to prevent popup
                     unsafeWindow.open = function (url, ...args) {
                         log('window.open called with:', url, args);
-
-                        // Return a proxy window that intercepts location.href assignment
-                        const fakeWindow = {
+                        return {
                             closed: false,
-                            location: new Proxy({}, {
-                                set(target, prop, value) {
-                                    log(`Intercepted location.${prop} = ${value}`);
-                                    if (prop === 'href' && value && value.startsWith('blob:')) {
-                                        blobUrl = value;
-                                        log('Captured blob URL via location.href:', blobUrl);
-                                    }
-                                    target[prop] = value;
-                                    return true;
-                                },
-                                get(target, prop) {
-                                    return target[prop];
-                                }
-                            }),
-                            document: {
-                                write: () => {
-                                }, close: () => {
-                                }
-                            },
-                            focus: () => {
-                            }
+                            location: {},
+                            document: { write: () => {}, close: () => {} },
+                            focus: () => {}
                         };
-
-                        // Also check if URL is directly a blob
-                        if (url && url.startsWith('blob:')) {
-                            blobUrl = url;
-                            log('Captured blob URL directly:', blobUrl);
-                        }
-
-                        return fakeWindow;
                     };
 
                     formButton.click();
                     await new Promise(resolve => setTimeout(resolve, 500));
 
-                    // Restore original window.open
+                    // Restore original functions
                     unsafeWindow.open = originalOpen;
+                    unsafeWindow.URL.createObjectURL = originalCreateObjectURL;
 
-                    log('Final blobUrl:', blobUrl);
-
-                    // Fetch the blob if we captured it
-                    if (blobUrl) {
-                        try {
-                            const response = await fetch(blobUrl);
-                            const blob = await response.blob();
-
-                            const result = {
-                                labels: blob
-                            };
-
-                            results.push(result);
-                            log(`Result for row ${rowId}:`, result);
-                        } catch (error) {
-                            console.error(`Error processing blob for row ${rowId}:`, error);
-                        }
+                    // Use the captured blob directly
+                    if (capturedBlob) {
+                        results.push({ labels: capturedBlob });
+                        log(`Captured blob for row ${rowId}:`, capturedBlob.size, 'bytes');
                     } else {
-                        console.warn(`No blob URL was captured for row ${rowId}`);
+                        console.warn(`No PDF blob was captured for row ${rowId}`);
                     }
                 } else {
                     console.warn(`Form button not found for row ${rowId}`);
                 }
 
                 // Find and click the close button twice
-                let closeButtons = document.querySelectorAll('button[aria-label="close"]');
-                log(`Found ${closeButtons.length} close buttons for row ${rowId}`);
-                if (closeButtons.length > 0) {
-                    // Get the innermost (last) close button
-                    let closeButton = closeButtons[closeButtons.length - 1];
-
-                    closeButton.click();
+                const labelCloseButton = document.evaluate(
+                    '//div[text()="Etikett und Abfüllprotokoll"]/following-sibling::button[@aria-label="Schließen"]',
+                    document,
+                    null,
+                    XPathResult.FIRST_ORDERED_NODE_TYPE,
+                    null
+                ).singleNodeValue;
+                log(`Found close button for row ${rowId}`);
+                if (labelCloseButton) {
+                    labelCloseButton.click();
                     await new Promise(resolve => setTimeout(resolve, 50));
 
                     // Re-query for the second click
-                    closeButtons = document.querySelectorAll('div[role="dialog"] button[aria-label="close"]');
+                    const closeButtons = document.querySelectorAll('div[role="dialog"] button[aria-label="close"]');
                     log(`Found ${closeButtons.length} close buttons after first click for row ${rowId}`);
                     if (closeButtons.length > 0) {
-                        closeButton = closeButtons[0];
+                        const closeButton = closeButtons[0];
                         closeButton.click();
                         await new Promise(resolve => setTimeout(resolve, 50));
                     }
