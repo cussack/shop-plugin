@@ -711,12 +711,17 @@
                     labelCloseButton.click();
                     await new Promise(resolve => setTimeout(resolve, 50));
 
-                    // Re-query for the second click
-                    const closeButtons = document.querySelectorAll('div[role="dialog"] button[aria-label="close"]');
-                    log(`Found ${closeButtons.length} close buttons after first click for row ${rowId}`);
-                    if (closeButtons.length > 0) {
-                        const closeButton = closeButtons[0];
-                        closeButton.click();
+                    // Re-query for the second close button
+                    const secondCloseButton = document.evaluate(
+                        '//div[text()="Lieferinformationen"]/following-sibling::button[@aria-label="Schließen"]',
+                        document,
+                        null,
+                        XPathResult.FIRST_ORDERED_NODE_TYPE,
+                        null
+                    ).singleNodeValue;
+                    log(`Found second close button for row ${rowId}: ${!!secondCloseButton}`);
+                    if (secondCloseButton) {
+                        secondCloseButton.click();
                         await new Promise(resolve => setTimeout(resolve, 50));
                     }
                 } else {
