@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Cannabis Apotheke Row Selector
 // @namespace    http://tampermonkey.net/
-// @version      1.4
+// @version      1.5
 // @description  Add checkboxes to select rows in MUI DataGrid
 // @author       You
 // @match        https://shop.cannabis-apotheke-luebeck.de/account/dashboard
@@ -414,7 +414,9 @@
                 log('Successfully merged PDFs');
 
                 // Download the merged PDF
-                downloadPDF(mergedPdf, 'merged-labels.pdf');
+                const now = new Date();
+                const timestamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}-${String(now.getMinutes()).padStart(2, '0')}-${String(now.getSeconds()).padStart(2, '0')}`;
+                downloadPDF(mergedPdf, `labels_${timestamp}.pdf`);
 
                 // Change status of all processed rows to "inprocess"
                 log('Changing status of processed rows to inprocess');
