@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Cannabis Apotheke Row Selector
 // @namespace    http://tampermonkey.net/
-// @version      1.3
+// @version      1.4
 // @description  Add checkboxes to select rows in MUI DataGrid
 // @author       You
 // @match        https://shop.cannabis-apotheke-luebeck.de/account/dashboard
@@ -145,24 +145,18 @@
             <button class="toggle-button">Auswahlboxen anzeigen</button>
             <button class="action-button accept-button" disabled>Bestellungen bestätigen (0)</button>
             <button class="action-button print-labels-button" disabled>Labels ausdrucken & auf in Bearbeitung setzen (0)</button>
-            <button class="action-button download-protocols-button" disabled>Protokolle erzeugen (0)</button>
-            <button class="action-button ready-for-pickup-button" disabled>Auf abholbereit setzen & Mail versenden (0)</button>
         `;
         document.body.appendChild(container);
 
         const acceptButton = container.querySelector('.accept-button');
         const printLabelsButton = container.querySelector('.print-labels-button');
-        const downloadProtocolsButton = container.querySelector('.download-protocols-button');
-        const readyForPickupButton = container.querySelector('.ready-for-pickup-button');
         const toggleButton = container.querySelector('.toggle-button');
 
         acceptButton.addEventListener('click', handleAcceptAction);
         printLabelsButton.addEventListener('click', handlePrintLabelsAction);
-        downloadProtocolsButton.addEventListener('click', handleDownloadProtocolsAction);
-        readyForPickupButton.addEventListener('click', handleReadyForPickupAction);
         toggleButton.addEventListener('click', () => toggleCheckboxes(toggleButton));
 
-        return {acceptButton, printLabelsButton, downloadProtocolsButton, readyForPickupButton, toggleButton};
+        return {acceptButton, printLabelsButton, toggleButton};
     }
 
     // Create visibility toggle button
@@ -232,22 +226,28 @@
                 }
 
                 reservationButton.click();
-                await new Promise(resolve => setTimeout(resolve, 250));
+                await new Promise(resolve => setTimeout(resolve, 375));
 
                 log(`Clicked reservation button for row ${rowId}`);
 
                 // Click the appropriate button based on debug mode
-                const buttonType = debugMode ? 'button' : 'submit';
-                const formButton = document.querySelector(`div[role="dialog"] form button[type="${buttonType}"]:not([aria-label]`);
+                const buttonText = debugMode ? 'Abbrechen' : 'Speichern und senden';
+                const formButton = document.evaluate(
+                    `//button[text()="${buttonText}"]`,
+                    document,
+                    null,
+                    XPathResult.FIRST_ORDERED_NODE_TYPE,
+                    null
+                ).singleNodeValue;
                 if (!formButton) {
-                    console.error(`Form button (${buttonType}) not found for row ${rowId}`);
+                    console.error(`Form button ("${buttonText}") not found for row ${rowId}`);
                     continue;
                 }
 
                 formButton.click();
-                await new Promise(resolve => setTimeout(resolve, 500));
+                await new Promise(resolve => setTimeout(resolve, 750));
 
-                log(`Clicked form ${buttonType} button for row ${rowId}`);
+                log(`Clicked form "${buttonText}" button for row ${rowId}`);
 
             } catch (error) {
                 console.error(`Error accepting row ${rowId}:`, error);
@@ -255,338 +255,6 @@
         }
 
         log('Finished accepting all selected rows');
-    }
-
-    // Handle ready for pickup button click
-    async function handleReadyForPickupAction() {
-        const selectedIds = Array.from(selectedRows);
-        log('Setting rows to pickupready, row IDs:', selectedIds);
-
-        for (const rowId of selectedIds) {
-            try {
-                // Find the row
-                const row = document.querySelector(`.MuiDataGrid-row[data-id="${rowId}"]`);
-                if (!row) {
-                    console.error(`Row with ID ${rowId} not found`);
-                    continue;
-                }
-
-                // Find and click the reservation button
-                const reservationButton = row.querySelector('div[data-field="reservation"] div[role="button"]');
-                if (!reservationButton) {
-                    console.error(`Reservation button not found for row ${rowId}`);
-                    continue;
-                }
-
-                reservationButton.click();
-                await new Promise(resolve => setTimeout(resolve, 250));
-
-                log(`Clicked reservation button for row ${rowId}`);
-
-                // Click the status dropdown
-                const statusDropdown = document.querySelector('#status');
-                if (!statusDropdown) {
-                    console.error(`Status dropdown not found for row ${rowId}`);
-                    continue;
-                }
-
-                statusDropdown.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
-                await new Promise(resolve => setTimeout(resolve, 50));
-
-                // Select "pickupready" option
-                const pickupreadyOption = document.querySelector('#menu-status ul li[data-value="pickupready"]');
-                if (!pickupreadyOption) {
-                    console.error(`Pickupready option not found for row ${rowId}`);
-                    continue;
-                }
-
-                pickupreadyOption.click();
-                await new Promise(resolve => setTimeout(resolve, 50));
-
-                // Click the appropriate button based on debug mode
-                const buttonType = debugMode ? 'button' : 'submit';
-                const formButton = document.querySelector(`div[role="dialog"] form button[type="${buttonType}"]:not([aria-label]`);
-                if (!formButton) {
-                    console.error(`Form button (${buttonType}) not found for row ${rowId}`);
-                    continue;
-                }
-
-                formButton.click();
-                await new Promise(resolve => setTimeout(resolve, 250));
-
-                log(`Changed status to pickupready for row ${rowId}`);
-
-            } catch (error) {
-                console.error(`Error setting row ${rowId} to pickupready:`, error);
-            }
-        }
-
-        log('Finished setting all selected rows to pickupready');
-    }
-
-    // Handle download protocols button click
-    async function handleDownloadProtocolsAction() {
-        const selectedIds = Array.from(selectedRows);
-        log('Downloading protocols for row IDs:', selectedIds);
-
-        for (const rowId of selectedIds) {
-            try {
-                // Find the row
-                const row = document.querySelector(`.MuiDataGrid-row[data-id="${rowId}"]`);
-                if (!row) {
-                    console.error(`Row with ID ${rowId} not found`);
-                    continue;
-                }
-
-                // Find and click the delivery button
-                const deliveryButton = row.querySelector('div[data-field="delivery"] div[role="button"]');
-                if (!deliveryButton) {
-                    console.error(`Delivery button not found for row ${rowId}`);
-                    continue;
-                }
-
-                deliveryButton.click();
-                await new Promise(resolve => setTimeout(resolve, 50));
-
-                // Find and click the button in the modal
-                const modal = document.querySelector('div[aria-modal="true"]');
-                if (!modal) {
-                    console.error(`Modal not opened for row ${rowId}`);
-                    continue;
-                }
-
-                const modalButton = modal.querySelector('thead th button');
-                if (!modalButton) {
-                    console.error(`Modal button not found for row ${rowId}`);
-                    continue;
-                }
-
-                // Wait for modal button to be enabled
-                let attempts = 0;
-                while (modalButton.disabled && attempts < 100) {
-                    await new Promise(resolve => setTimeout(resolve, 50));
-                    attempts++;
-                }
-
-                if (modalButton.disabled) {
-                    console.error(`Modal button never enabled for row ${rowId}`);
-                    continue;
-                }
-
-                log(`Modal button enabled after ${attempts * 50}ms for row ${rowId}`);
-
-                modalButton.click();
-                await new Promise(resolve => setTimeout(resolve, 50));
-
-                // Loop over all amount fields and update is_amount fields
-                let productIndex = 0;
-                while (true) {
-                    const amountField = document.querySelector(`input[name="products.${productIndex}.amount"]`);
-                    if (!amountField) {
-                        break; // No more products
-                    }
-
-                    // Read the current value
-                    const currentValue = parseFloat(amountField.value);
-                    if (!isNaN(currentValue)) {
-                        // Add random value between 0 and 0.2
-                        const randomValue = Math.random() * 0.2;
-                        const increasedValue = currentValue + randomValue;
-
-                        // Round to 2 decimal digits
-                        const roundedValue = Math.round(increasedValue * 100) / 100;
-
-                        // Set in corresponding is_amount field
-                        const isAmountField = document.querySelector(`input[name="products.${productIndex}.is_amount"]`);
-                        if (isAmountField) {
-                            // Update the value and trigger React events for MUI controlled input
-                            const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
-                            nativeInputValueSetter.call(isAmountField, roundedValue.toFixed(2));
-
-                            // Trigger input event for React to detect the change
-                            const inputEvent = new Event('input', { bubbles: true });
-                            isAmountField.dispatchEvent(inputEvent);
-
-                            // Trigger change event as well
-                            const changeEvent = new Event('change', { bubbles: true });
-                            isAmountField.dispatchEvent(changeEvent);
-
-                            log(`Set products.${productIndex}.is_amount to ${roundedValue.toFixed(2)} (from ${currentValue})`);
-                        } else {
-                            console.warn(`is_amount field not found for product ${productIndex}`);
-                        }
-                    }
-
-                    // Open the packaging selectbox
-                    const packageSelectBox = document.querySelector(`div[name="products.${productIndex}.packagename"] > div > div`);
-                    if (packageSelectBox) {
-                        // Open the MUI select by dispatching mousedown event
-                        packageSelectBox.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
-                        await new Promise(resolve => setTimeout(resolve, 50));
-                        log(`Opened package select for product ${productIndex}`);
-
-                        // Select the appropriate option based on currentValue
-                        const listItems = document.querySelectorAll('ul[role="listbox"] li');
-                        if (listItems.length >= 3) {
-                            let selectedItem;
-                            if (currentValue <= 10) {
-                                selectedItem = listItems[0];
-                                log(`Selecting first option for product ${productIndex} (currentValue: ${currentValue})`);
-                            } else if (currentValue <= 25) {
-                                selectedItem = listItems[1];
-                                log(`Selecting second option for product ${productIndex} (currentValue: ${currentValue})`);
-                            } else {
-                                selectedItem = listItems[2];
-                                log(`Selecting third option for product ${productIndex} (currentValue: ${currentValue})`);
-                            }
-                            selectedItem.click();
-                            await new Promise(resolve => setTimeout(resolve, 50));
-                        } else {
-                            console.warn(`Expected 3 list items, found ${listItems.length} for product ${productIndex}`);
-                        }
-                    } else {
-                        console.warn(`Package select not found for product ${productIndex}`);
-                    }
-
-                    productIndex++;
-                }
-
-                // Select the acting person
-                const workerSelectBox = document.querySelector('div[name="worker"] > div > div');
-                if (workerSelectBox) {
-                    workerSelectBox.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
-                    await new Promise(resolve => setTimeout(resolve, 50));
-
-                    // Pick one of the first four options randomly
-                    const workerOptions = document.querySelectorAll('ul[role="listbox"] li');
-                    if (workerOptions.length >= 1) {
-                        const maxIndex = Math.min(4, workerOptions.length);
-                        const randomIndex = Math.floor(Math.random() * maxIndex);
-                        workerOptions[randomIndex].click();
-                        await new Promise(resolve => setTimeout(resolve, 50));
-                        log(`Selected worker option ${randomIndex} for row ${rowId}`);
-                    } else {
-                        console.warn(`No worker options found for row ${rowId}`);
-                    }
-                } else {
-                    console.warn(`Worker select not found for row ${rowId}`);
-                }
-
-                // Find and click the form button to download protocol
-                const formButton = document.evaluate(
-                    '//button[text()="Protokoll erzeugen"]',
-                    document,
-                    null,
-                    XPathResult.FIRST_ORDERED_NODE_TYPE,
-                    null
-                ).singleNodeValue;
-                if (formButton) {
-                    // Intercept blob URL opening
-                    const originalOpen = unsafeWindow.open;
-                    let blobUrl = null;
-
-                    unsafeWindow.open = function (url, ...args) {
-                        log('window.open called with:', url, args);
-
-                        // Return a proxy window that intercepts location.href assignment
-                        const fakeWindow = {
-                            closed: false,
-                            location: new Proxy({}, {
-                                set(target, prop, value) {
-                                    log(`Intercepted location.${prop} = ${value}`);
-                                    if (prop === 'href' && value && value.startsWith('blob:')) {
-                                        blobUrl = value;
-                                        log('Captured blob URL via location.href:', blobUrl);
-                                    }
-                                    target[prop] = value;
-                                    return true;
-                                },
-                                get(target, prop) {
-                                    return target[prop];
-                                }
-                            }),
-                            document: {
-                                write: () => {},
-                                close: () => {}
-                            },
-                            focus: () => {}
-                        };
-
-                        // Also check if URL is directly a blob
-                        if (url && url.startsWith('blob:')) {
-                            blobUrl = url;
-                            log('Captured blob URL directly:', blobUrl);
-                        }
-
-                        return fakeWindow;
-                    };
-
-                    formButton.click();
-                    await new Promise(resolve => setTimeout(resolve, 500));
-
-                    // Restore original window.open
-                    unsafeWindow.open = originalOpen;
-
-                    log('Final blobUrl:', blobUrl);
-
-                    // Download the blob if we captured it
-                    if (blobUrl) {
-                        try {
-                            // Generate filename with timestamp and row ID
-                            const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
-                            const filename = `Protokoll_${rowId}_${timestamp}.pdf`;
-                            const savePath = `C:\\Users\\xtwin\\Desktop\\Cannabis Protokolle\\${filename}`;
-
-                            // Download using GM_download
-                            GM_download({
-                                url: blobUrl,
-                                name: savePath,
-                                saveAs: false,
-                                onload: () => {
-                                    log(`Successfully downloaded protocol for row ${rowId} to ${savePath}`);
-                                },
-                                onerror: (error) => {
-                                    console.error(`Error downloading protocol for row ${rowId}:`, error);
-                                }
-                            });
-                        } catch (error) {
-                            console.error(`Error processing blob for row ${rowId}:`, error);
-                        }
-                    } else {
-                        console.warn(`No blob URL was captured for row ${rowId}`);
-                    }
-                } else {
-                    console.warn(`Form button not found for row ${rowId}`);
-                }
-
-                // Find and click the close button twice
-                let closeButtons = document.querySelectorAll('button[aria-label="close"]');
-                log(`Found ${closeButtons.length} close buttons for row ${rowId}`);
-                if (closeButtons.length > 0) {
-                    // Get the innermost (last) close button
-                    let closeButton = closeButtons[closeButtons.length - 1];
-
-                    closeButton.click();
-                    await new Promise(resolve => setTimeout(resolve, 50));
-
-                    // Re-query for the second click
-                    closeButtons = document.querySelectorAll('div[role="dialog"] button[aria-label="close"]');
-                    log(`Found ${closeButtons.length} close buttons after first click for row ${rowId}`);
-                    if (closeButtons.length > 0) {
-                        closeButton = closeButtons[0];
-                        closeButton.click();
-                        await new Promise(resolve => setTimeout(resolve, 50));
-                    }
-                } else {
-                    console.warn(`Close button not found for row ${rowId}`);
-                }
-
-            } catch (error) {
-                console.error(`Error processing row ${rowId}:`, error);
-            }
-        }
-
-        log('Finished downloading protocols for all selected rows');
     }
 
     // Handle action button click
@@ -613,7 +281,7 @@
                 }
 
                 deliveryButton.click();
-                await new Promise(resolve => setTimeout(resolve, 50));
+                await new Promise(resolve => setTimeout(resolve, 75));
 
                 // Find and click the button in the modal
                 const modal = document.querySelector('div[aria-modal="true"]');
@@ -631,7 +299,7 @@
                 // Wait for modal button to be enabled
                 let attempts = 0;
                 while (modalButton.disabled && attempts < 100) {
-                    await new Promise(resolve => setTimeout(resolve, 50));
+                    await new Promise(resolve => setTimeout(resolve, 75));
                     attempts++;
                 }
 
@@ -640,10 +308,10 @@
                     continue;
                 }
 
-                log(`Modal button enabled after ${attempts * 50}ms for row ${rowId}`);
+                log(`Modal button enabled after ${attempts * 75}ms for row ${rowId}`);
 
                 modalButton.click();
-                await new Promise(resolve => setTimeout(resolve, 150));
+                await new Promise(resolve => setTimeout(resolve, 225));
 
                 // Find and click the form button to open blob URL
                 const formButton = document.evaluate(
@@ -681,7 +349,7 @@
                     };
 
                     formButton.click();
-                    await new Promise(resolve => setTimeout(resolve, 500));
+                    await new Promise(resolve => setTimeout(resolve, 750));
 
                     // Restore original functions
                     unsafeWindow.open = originalOpen;
@@ -709,7 +377,7 @@
                 log(`Found close button for row ${rowId}`);
                 if (labelCloseButton) {
                     labelCloseButton.click();
-                    await new Promise(resolve => setTimeout(resolve, 50));
+                    await new Promise(resolve => setTimeout(resolve, 75));
 
                     // Re-query for the second close button
                     const secondCloseButton = document.evaluate(
@@ -722,7 +390,7 @@
                     log(`Found second close button for row ${rowId}: ${!!secondCloseButton}`);
                     if (secondCloseButton) {
                         secondCloseButton.click();
-                        await new Promise(resolve => setTimeout(resolve, 50));
+                        await new Promise(resolve => setTimeout(resolve, 75));
                     }
                 } else {
                     console.warn(`Close button not found for row ${rowId}`);
@@ -766,7 +434,7 @@
                         }
 
                         reservationButton.click();
-                        await new Promise(resolve => setTimeout(resolve, 250));
+                        await new Promise(resolve => setTimeout(resolve, 375));
 
                         // Click the status dropdown
                         const statusDropdown = document.querySelector('#status');
@@ -776,7 +444,7 @@
                         }
 
                         statusDropdown.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));;
-                        await new Promise(resolve => setTimeout(resolve, 50));
+                        await new Promise(resolve => setTimeout(resolve, 75));
 
                         // Select "inprocess" option
                         const inprocessOption = document.querySelector('#menu-status ul li[data-value="inprocess"]');
@@ -786,22 +454,28 @@
                         }
 
                         inprocessOption.click();
-                        await new Promise(resolve => setTimeout(resolve, 50));
+                        await new Promise(resolve => setTimeout(resolve, 75));
 
                         const sendMailCheckbox = document.querySelector('form input[name="sendMailToCustomer"]');
                         sendMailCheckbox.click();
-                        await new Promise(resolve => setTimeout(resolve, 50));
+                        await new Promise(resolve => setTimeout(resolve, 75));
 
                         // Click the appropriate button based on debug mode
-                        const buttonType = debugMode ? 'button' : 'submit';
-                        const formButton = document.querySelector(`div[role="dialog"] form button[type="${buttonType}"]:not([aria-label]`);
+                        const buttonText = debugMode ? 'Abbrechen' : 'Speichern und senden';
+                        const formButton = document.evaluate(
+                            `//button[text()="${buttonText}"]`,
+                            document,
+                            null,
+                            XPathResult.FIRST_ORDERED_NODE_TYPE,
+                            null
+                        ).singleNodeValue;
                         if (!formButton) {
-                            console.error(`Form button (${buttonType}) not found for row ${rowId}`);
+                            console.error(`Form button ("${buttonText}") not found for row ${rowId}`);
                             continue;
                         }
 
                         formButton.click();
-                        await new Promise(resolve => setTimeout(resolve, 500));
+                        await new Promise(resolve => setTimeout(resolve, 750));
 
                         log(`Changed status to inprocess for row ${rowId}`);
 
