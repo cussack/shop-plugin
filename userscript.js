@@ -545,22 +545,8 @@
         button.disabled = count === 0;
     }
 
-    // Update download protocols button state
-    function updateDownloadProtocolsButton(button) {
-        const count = selectedRows.size;
-        button.textContent = `Protokolle erzeugen (${count})`;
-        button.disabled = count === 0;
-    }
-
-    // Update ready for pickup button state
-    function updateReadyForPickupButton(button) {
-        const count = selectedRows.size;
-        button.textContent = `Auf abholbereit setzen & Mail versenden (${count})`;
-        button.disabled = count === 0;
-    }
-
     // Add checkbox to a row
-    function addCheckboxToRow(row, acceptButton, printLabelsButton, downloadProtocolsButton, readyForPickupButton) {
+    function addCheckboxToRow(row, acceptButton, printLabelsButton) {
         // Skip if checkbox already exists
         if (row.querySelector('.row-selector-checkbox')) return;
 
@@ -589,8 +575,6 @@
             }
             updateAcceptButton(acceptButton);
             updatePrintLabelsButton(printLabelsButton);
-            updateDownloadProtocolsButton(downloadProtocolsButton);
-            updateReadyForPickupButton(readyForPickupButton);
             updateSelectAllCheckbox();
         });
 
@@ -611,7 +595,7 @@
     }
 
     // Add checkbox to header
-    function addCheckboxToHeader(acceptButton, printLabelsButton, downloadProtocolsButton, readyForPickupButton) {
+    function addCheckboxToHeader(acceptButton, printLabelsButton) {
         const header = document.querySelector('.MuiDataGrid-columnHeaders');
         if (!header || header.querySelector('.header-selector-checkbox')) return;
 
@@ -648,8 +632,6 @@
             });
             updateAcceptButton(acceptButton);
             updatePrintLabelsButton(printLabelsButton);
-            updateDownloadProtocolsButton(downloadProtocolsButton);
-            updateReadyForPickupButton(readyForPickupButton);
         });
 
         checkboxCell.appendChild(checkbox);
@@ -682,7 +664,7 @@
     // Initialize
     function init() {
         injectStyles();
-        const {acceptButton, printLabelsButton, downloadProtocolsButton, readyForPickupButton, toggleButton} = createButtons();
+        const {acceptButton, printLabelsButton, toggleButton} = createButtons();
 
         // Get the button container
         const buttonContainer = document.querySelector('.button-container');
@@ -697,9 +679,9 @@
 
         // Initial setup
         setTimeout(() => {
-            addCheckboxToHeader(acceptButton, printLabelsButton, downloadProtocolsButton, readyForPickupButton);
+            addCheckboxToHeader(acceptButton, printLabelsButton);
             document.querySelectorAll('.MuiDataGrid-row').forEach(row => {
-                addCheckboxToRow(row, acceptButton, printLabelsButton, downloadProtocolsButton, readyForPickupButton);
+                addCheckboxToRow(row, acceptButton, printLabelsButton);
             });
         }, 1000);
 
@@ -709,15 +691,15 @@
                 mutation.addedNodes.forEach((node) => {
                     if (node.nodeType === 1) {
                         if (node.classList && node.classList.contains('MuiDataGrid-row')) {
-                            addCheckboxToRow(node, acceptButton, printLabelsButton, downloadProtocolsButton, readyForPickupButton);
+                            addCheckboxToRow(node, acceptButton, printLabelsButton);
                         }
                         if (node.classList && node.classList.contains('MuiDataGrid-columnHeaders')) {
-                            addCheckboxToHeader(acceptButton, printLabelsButton, downloadProtocolsButton, readyForPickupButton);
+                            addCheckboxToHeader(acceptButton, printLabelsButton);
                         }
                         // Check children
                         if (node.querySelectorAll) {
                             node.querySelectorAll('.MuiDataGrid-row').forEach(row => {
-                                addCheckboxToRow(row, acceptButton, printLabelsButton, downloadProtocolsButton, readyForPickupButton);
+                                addCheckboxToRow(row, acceptButton, printLabelsButton);
                             });
                         }
                     }
