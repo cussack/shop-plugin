@@ -226,19 +226,21 @@
                 }
 
                 reservationButton.click();
-                await new Promise(resolve => setTimeout(resolve, 375));
-
                 log(`Clicked reservation button for row ${rowId}`);
 
                 // Click the appropriate button based on debug mode
                 const buttonText = debugMode ? 'Abbrechen' : 'Speichern und senden';
-                const formButton = document.evaluate(
-                    `//button[text()="${buttonText}"]`,
-                    document,
-                    null,
-                    XPathResult.FIRST_ORDERED_NODE_TYPE,
-                    null
-                ).singleNodeValue;
+                let formButton = null;
+                for (let i = 0; i < 20 && !formButton; i++) {
+                    await new Promise(resolve => setTimeout(resolve, 50));
+                    formButton = document.evaluate(
+                        `//button[text()="${buttonText}"]`,
+                        document,
+                        null,
+                        XPathResult.FIRST_ORDERED_NODE_TYPE,
+                        null
+                    ).singleNodeValue;
+                }
                 if (!formButton) {
                     console.error(`Form button ("${buttonText}") not found for row ${rowId}`);
                     continue;
@@ -320,16 +322,19 @@
                 log(`Modal button enabled after ${attempts * 75}ms for row ${rowId}`);
 
                 modalButton.click();
-                await new Promise(resolve => setTimeout(resolve, 225));
 
                 // Find and click the form button to open blob URL
-                const formButton = document.evaluate(
-                    '//button[text()="Etikett erzeugen"]',
-                    document,
-                    null,
-                    XPathResult.FIRST_ORDERED_NODE_TYPE,
-                    null
-                ).singleNodeValue;
+                let formButton = null;
+                for (let i = 0; i < 20 && !formButton; i++) {
+                    await new Promise(resolve => setTimeout(resolve, 50));
+                    formButton = document.evaluate(
+                        '//button[text()="Etikett erzeugen"]',
+                        document,
+                        null,
+                        XPathResult.FIRST_ORDERED_NODE_TYPE,
+                        null
+                    ).singleNodeValue;
+                }
                 if (formButton) {
                     // Intercept blob creation and window.open to capture PDF blob directly
                     const originalOpen = unsafeWindow.open;
