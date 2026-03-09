@@ -290,7 +290,16 @@
                     continue;
                 }
 
-                const modalButton = modal.querySelector('thead th button');
+                let modalButton = modal.querySelector('thead th button');
+                if (!modalButton) {
+                    // Retry up to ~1.5s for the modal button to appear
+                    let btnAttempts = 0;
+                    while (!modalButton && btnAttempts < 20) {
+                        await new Promise(resolve => setTimeout(resolve, 75));
+                        modalButton = modal.querySelector('thead th button');
+                        btnAttempts++;
+                    }
+                }
                 if (!modalButton) {
                     console.error(`Modal button not found for row ${rowId}`);
                     continue;
