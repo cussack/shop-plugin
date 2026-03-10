@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Cannabis Apotheke Row Selector
 // @namespace    http://tampermonkey.net/
-// @version      1.6
+// @version      1.7
 // @description  Add checkboxes to select rows in MUI DataGrid
 // @author       You
 // @match        https://shop.cannabis-apotheke-luebeck.de/account/dashboard
@@ -246,7 +246,14 @@
                     continue;
                 }
 
+                const sendMailCheckbox = document.querySelector('form input[name="sendMailToCustomer"]');
+                if (sendMailCheckbox) {
+                    sendMailCheckbox.click();
+                    await new Promise(resolve => setTimeout(resolve, 75));
+                }
+
                 await new Promise(resolve => setTimeout(resolve, 350));
+
                 formButton.click();
                 for (let i = 0; i < 20 && document.querySelector('div[aria-modal="true"]'); i++) {
                     await new Promise(resolve => setTimeout(resolve, 50));
