@@ -246,6 +246,7 @@
                     continue;
                 }
 
+                await new Promise(resolve => setTimeout(resolve, 250));
                 formButton.click();
                 for (let i = 0; i < 20 && document.querySelector('div[aria-modal="true"]'); i++) {
                     await new Promise(resolve => setTimeout(resolve, 50));
