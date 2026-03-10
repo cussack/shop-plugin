@@ -247,7 +247,9 @@
                 }
 
                 formButton.click();
-                await new Promise(resolve => setTimeout(resolve, 750));
+                for (let i = 0; i < 20 && document.querySelector('div[aria-modal="true"]'); i++) {
+                    await new Promise(resolve => setTimeout(resolve, 50));
+                }
 
                 log(`Clicked form "${buttonText}" button for row ${rowId}`);
 
@@ -363,7 +365,9 @@
                     };
 
                     formButton.click();
-                    await new Promise(resolve => setTimeout(resolve, 750));
+                    for (let i = 0; i < 50 && !capturedBlob; i++) {
+                        await new Promise(resolve => setTimeout(resolve, 50));
+                    }
 
                     // Restore original functions
                     unsafeWindow.open = originalOpen;
@@ -491,7 +495,9 @@
                         }
 
                         formButton.click();
-                        await new Promise(resolve => setTimeout(resolve, 750));
+                        for (let i = 0; i < 20 && document.querySelector('div[aria-modal="true"]'); i++) {
+                            await new Promise(resolve => setTimeout(resolve, 50));
+                        }
 
                         log(`Changed status to inprocess for row ${rowId}`);
 
