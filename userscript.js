@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Cannabis Apotheke Row Selector
 // @namespace    http://tampermonkey.net/
-// @version      1.7
-// @description  Add checkboxes to select rows in MUI DataGrid
+// @version      1.8
+// @description  Print labels for selected rows in MUI DataGrid
 // @author       You
 // @match        https://shop.cannabis-apotheke-luebeck.de/account/dashboard
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=shop.cannabis-apotheke-luebeck.de
@@ -44,30 +44,10 @@
         return Promise.resolve(PDFLib);
     }
 
-    const selectedRows = new Set();
-    let checkboxesVisible = false;
-
     // Create and inject styles
     function injectStyles() {
         const style = document.createElement('style');
         style.textContent = `
-            .row-selector-checkbox {
-                width: 18px;
-                height: 18px;
-                cursor: pointer;
-                margin: 0 auto;
-                display: block;
-            }
-            .MuiDataGrid-cell[data-field="__checkbox__"],
-            .MuiDataGrid-columnHeader[data-field="__checkbox__"] {
-                display: none !important;
-                align-items: center !important;
-                justify-content: center !important;
-            }
-            .checkboxes-visible .MuiDataGrid-cell[data-field="__checkbox__"],
-            .checkboxes-visible .MuiDataGrid-columnHeader[data-field="__checkbox__"] {
-                display: flex !important;
-            }
             .row-selected {
                 background-color: rgba(25, 118, 210, 0.08) !important;
             }
@@ -81,7 +61,7 @@
                 flex-direction: column;
                 align-items: flex-end;
             }
-            .action-button, .toggle-button {
+            .action-button {
                 background-color: #1976d2;
                 color: white;
                 border: none;
@@ -93,18 +73,12 @@
                 box-shadow: 0 3px 5px rgba(0,0,0,0.2);
                 transition: background-color 0.3s;
             }
-            .action-button:hover, .toggle-button:hover {
+            .action-button:hover {
                 background-color: #1565c0;
             }
             .action-button:disabled {
                 background-color: #ccc;
                 cursor: not-allowed;
-            }
-            .toggle-button.active {
-                background-color: #2e7d32;
-            }
-            .toggle-button.active:hover {
-                background-color: #1b5e20;
             }
             .visibility-toggle {
                 position: fixed;
@@ -142,18 +116,14 @@
         const container = document.createElement('div');
         container.className = 'button-container';
         container.innerHTML = `
-            <button class="toggle-button">Auswahlboxen anzeigen</button>
             <button class="action-button print-labels-button" disabled>Labels ausdrucken (0)</button>
         `;
         document.body.appendChild(container);
 
         const printLabelsButton = container.querySelector('.print-labels-button');
-        const toggleButton = container.querySelector('.toggle-button');
-
         printLabelsButton.addEventListener('click', handlePrintLabelsAction);
-        toggleButton.addEventListener('click', () => toggleCheckboxes(toggleButton));
 
-        return {printLabelsButton, toggleButton};
+        return {printLabelsButton};
     }
 
     // Create visibility toggle button
@@ -185,38 +155,17 @@
         }
     }
 
-    // Toggle checkboxes visibility
-    function toggleCheckboxes(toggleButton) {
-        checkboxesVisible = !checkboxesVisible;
-        const dataGrid = document.querySelector('.MuiDataGrid-root');
-
-        if (checkboxesVisible) {
-            dataGrid.classList.add('checkboxes-visible');
-            toggleButton.classList.add('active');
-            toggleButton.textContent = 'Auswahlboxen verbergen';
-        } else {
-            dataGrid.classList.remove('checkboxes-visible');
-            toggleButton.classList.remove('active');
-            toggleButton.textContent = 'Auswahlboxen anzeigen';
-        }
-    }
-
     // Handle action button click
     async function handlePrintLabelsAction() {
-        const selectedIds = Array.from(selectedRows);
-        log('Processing labels for row IDs:', selectedIds);
+        const checkedBoxes = Array.from(document.querySelectorAll('input[name="select_row"]:checked'));
+        const rows = checkedBoxes.map(cb => cb.closest('.MuiDataGrid-row')).filter(Boolean);
+        log('Processing labels for rows:', rows.length);
 
         const results = [];
 
-        for (const rowId of selectedIds) {
+        for (const row of rows) {
+            const rowId = row.getAttribute('data-id');
             try {
-                // Find the row
-                const row = document.querySelector(`.MuiDataGrid-row[data-id="${rowId}"]`);
-                if (!row) {
-                    console.error(`Row with ID ${rowId} not found`);
-                    continue;
-                }
-
                 // Find and click the delivery button
                 const deliveryButton = row.querySelector('div[data-field="delivery"] div[role="button"]');
                 if (!deliveryButton) {
@@ -423,123 +372,9 @@
 
     // Update print labels button state
     function updatePrintLabelsButton(button) {
-        const count = selectedRows.size;
-        button.textContent = `Labels ausdrucken & auf in Bearbeitung setzen (${count})`;
+        const count = document.querySelectorAll('input[name="select_row"]:checked').length;
+        button.textContent = `Labels ausdrucken (${count})`;
         button.disabled = count === 0;
-    }
-
-    // Add checkbox to a row
-    function addCheckboxToRow(row, printLabelsButton) {
-        // Skip if checkbox already exists
-        if (row.querySelector('.row-selector-checkbox')) return;
-
-        const dataId = row.getAttribute('data-id');
-        if (!dataId) return;
-
-        // Create checkbox cell
-        const checkboxCell = document.createElement('div');
-        checkboxCell.className = 'MuiDataGrid-cell MuiDataGrid-cell--textCenter';
-        checkboxCell.setAttribute('role', 'gridcell');
-        checkboxCell.setAttribute('data-field', '__checkbox__');
-        checkboxCell.style.cssText = '--width: 50px; min-width: 50px;';
-
-        const checkbox = document.createElement('input');
-        checkbox.type = 'checkbox';
-        checkbox.className = 'row-selector-checkbox';
-        checkbox.checked = selectedRows.has(dataId);
-
-        checkbox.addEventListener('change', (e) => {
-            if (e.target.checked) {
-                selectedRows.add(dataId);
-                row.classList.add('row-selected');
-            } else {
-                selectedRows.delete(dataId);
-                row.classList.remove('row-selected');
-            }
-            updatePrintLabelsButton(printLabelsButton);
-            updateSelectAllCheckbox();
-        });
-
-        checkboxCell.appendChild(checkbox);
-
-        // Insert as first cell (after the offset div)
-        const offsetDiv = row.querySelector('.MuiDataGrid-cellOffsetLeft');
-        if (offsetDiv && offsetDiv.nextSibling) {
-            offsetDiv.parentNode.insertBefore(checkboxCell, offsetDiv.nextSibling);
-        } else {
-            row.insertBefore(checkboxCell, row.firstChild);
-        }
-
-        // Apply selected state if already selected
-        if (selectedRows.has(dataId)) {
-            row.classList.add('row-selected');
-        }
-    }
-
-    // Add checkbox to header
-    function addCheckboxToHeader(printLabelsButton) {
-        const header = document.querySelector('.MuiDataGrid-columnHeaders');
-        if (!header || header.querySelector('.header-selector-checkbox')) return;
-
-        const headerRow = header.querySelector('[role="row"]');
-        if (!headerRow) return;
-
-        const checkboxCell = document.createElement('div');
-        checkboxCell.className = 'MuiDataGrid-columnHeader MuiDataGrid-columnHeader--sortable';
-        checkboxCell.setAttribute('role', 'columnheader');
-        checkboxCell.setAttribute('data-field', '__checkbox__');
-        checkboxCell.style.cssText = '--width: 50px; min-width: 50px;';
-
-        const checkbox = document.createElement('input');
-        checkbox.type = 'checkbox';
-        checkbox.className = 'row-selector-checkbox header-selector-checkbox';
-
-        checkbox.addEventListener('change', (e) => {
-            const rows = document.querySelectorAll('.MuiDataGrid-row');
-            rows.forEach(row => {
-                const dataId = row.getAttribute('data-id');
-                if (!dataId) return;
-
-                const rowCheckbox = row.querySelector('.row-selector-checkbox');
-                if (rowCheckbox) {
-                    rowCheckbox.checked = e.target.checked;
-                    if (e.target.checked) {
-                        selectedRows.add(dataId);
-                        row.classList.add('row-selected');
-                    } else {
-                        selectedRows.delete(dataId);
-                        row.classList.remove('row-selected');
-                    }
-                }
-            });
-            updatePrintLabelsButton(printLabelsButton);
-        });
-
-        checkboxCell.appendChild(checkbox);
-
-        const offsetDiv = headerRow.querySelector('.MuiDataGrid-cellOffsetLeft');
-        if (offsetDiv && offsetDiv.nextSibling) {
-            offsetDiv.parentNode.insertBefore(checkboxCell, offsetDiv.nextSibling);
-        } else {
-            headerRow.insertBefore(checkboxCell, headerRow.firstChild);
-        }
-    }
-
-    // Update select all checkbox state
-    function updateSelectAllCheckbox() {
-        const headerCheckbox = document.querySelector('.header-selector-checkbox');
-        if (!headerCheckbox) return;
-
-        const allRows = document.querySelectorAll('.MuiDataGrid-row');
-        const allIds = Array.from(allRows)
-            .map(row => row.getAttribute('data-id'))
-            .filter(id => id);
-
-        const allSelected = allIds.length > 0 && allIds.every(id => selectedRows.has(id));
-        const someSelected = allIds.some(id => selectedRows.has(id));
-
-        headerCheckbox.checked = allSelected;
-        headerCheckbox.indeterminate = someSelected && !allSelected;
     }
 
     // Initialize
@@ -558,40 +393,31 @@
         // Create visibility toggle button
         createVisibilityToggle(buttonContainer);
 
-        // Initial setup
+        // Listen for native checkbox changes
+        document.addEventListener('change', (e) => {
+            if (e.target.type !== 'checkbox') return;
+            if (e.target.name === 'select_row') {
+                const row = e.target.closest('.MuiDataGrid-row');
+                if (row) {
+                    row.classList.toggle('row-selected', e.target.checked);
+                }
+                updatePrintLabelsButton(printLabelsButton);
+            }
+        });
+
+        // MutationObserver catches select-all state changes: React rerenders the row checkboxes
+        // rather than firing change events, so we watch the grid for DOM mutations.
         setTimeout(() => {
-            addCheckboxToHeader(printLabelsButton);
-            document.querySelectorAll('.MuiDataGrid-row').forEach(row => {
-                addCheckboxToRow(row, printLabelsButton);
-            });
+            updatePrintLabelsButton(printLabelsButton);
+            const grid = document.querySelector('.MuiDataGrid-root');
+            if (grid) {
+                let debounceTimer = null;
+                new MutationObserver(() => {
+                    clearTimeout(debounceTimer);
+                    debounceTimer = setTimeout(() => updatePrintLabelsButton(printLabelsButton), 50);
+                }).observe(grid, { subtree: true, childList: true, attributes: true, attributeFilter: ['checked'] });
+            }
         }, 1000);
-
-        // Watch for dynamically added rows
-        const observer = new MutationObserver((mutations) => {
-            mutations.forEach((mutation) => {
-                mutation.addedNodes.forEach((node) => {
-                    if (node.nodeType === 1) {
-                        if (node.classList && node.classList.contains('MuiDataGrid-row')) {
-                            addCheckboxToRow(node, printLabelsButton);
-                        }
-                        if (node.classList && node.classList.contains('MuiDataGrid-columnHeaders')) {
-                            addCheckboxToHeader(printLabelsButton);
-                        }
-                        // Check children
-                        if (node.querySelectorAll) {
-                            node.querySelectorAll('.MuiDataGrid-row').forEach(row => {
-                                addCheckboxToRow(row, printLabelsButton);
-                            });
-                        }
-                    }
-                });
-            });
-        });
-
-        observer.observe(document.body, {
-            childList: true,
-            subtree: true
-        });
     }
 
     // Wait for page to load
