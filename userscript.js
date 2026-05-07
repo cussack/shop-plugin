@@ -143,20 +143,17 @@
         container.className = 'button-container';
         container.innerHTML = `
             <button class="toggle-button">Auswahlboxen anzeigen</button>
-            <button class="action-button accept-button" disabled>Bestellungen bestätigen (0)</button>
             <button class="action-button print-labels-button" disabled>Labels ausdrucken & auf in Bearbeitung setzen (0)</button>
         `;
         document.body.appendChild(container);
 
-        const acceptButton = container.querySelector('.accept-button');
         const printLabelsButton = container.querySelector('.print-labels-button');
         const toggleButton = container.querySelector('.toggle-button');
 
-        acceptButton.addEventListener('click', handleAcceptAction);
         printLabelsButton.addEventListener('click', handlePrintLabelsAction);
         toggleButton.addEventListener('click', () => toggleCheckboxes(toggleButton));
 
-        return {acceptButton, printLabelsButton, toggleButton};
+        return {printLabelsButton, toggleButton};
     }
 
     // Create visibility toggle button
@@ -202,72 +199,6 @@
             toggleButton.classList.remove('active');
             toggleButton.textContent = 'Auswahlboxen anzeigen';
         }
-    }
-
-    // Handle accept button click
-    async function handleAcceptAction() {
-        const selectedIds = Array.from(selectedRows);
-        log('Accepting row IDs:', selectedIds);
-
-        for (const rowId of selectedIds) {
-            try {
-                // Find the row
-                const row = document.querySelector(`.MuiDataGrid-row[data-id="${rowId}"]`);
-                if (!row) {
-                    console.error(`Row with ID ${rowId} not found`);
-                    continue;
-                }
-
-                // Find and click the reservation button
-                const reservationButton = row.querySelector('div[data-field="reservation"] div[role="button"]');
-                if (!reservationButton) {
-                    console.error(`Reservation button not found for row ${rowId}`);
-                    continue;
-                }
-
-                reservationButton.click();
-                log(`Clicked reservation button for row ${rowId}`);
-
-                // Click the appropriate button based on debug mode
-                const buttonText = debugMode ? 'Abbrechen' : 'Speichern und senden';
-                let formButton = null;
-                for (let i = 0; i < 20 && !formButton; i++) {
-                    await new Promise(resolve => setTimeout(resolve, 50));
-                    formButton = document.evaluate(
-                        `//button[text()="${buttonText}"]`,
-                        document,
-                        null,
-                        XPathResult.FIRST_ORDERED_NODE_TYPE,
-                        null
-                    ).singleNodeValue;
-                }
-                if (!formButton) {
-                    console.error(`Form button ("${buttonText}") not found for row ${rowId}`);
-                    continue;
-                }
-
-                const sendMailCheckbox = document.querySelector('form input[name="sendMailToCustomer"]');
-                if (sendMailCheckbox) {
-                    sendMailCheckbox.click();
-                    await new Promise(resolve => setTimeout(resolve, 75));
-                }
-
-                await new Promise(resolve => setTimeout(resolve, 350));
-
-                formButton.click();
-                for (let i = 0; i < 20 && document.querySelector('div[aria-modal="true"]'); i++) {
-                    await new Promise(resolve => setTimeout(resolve, 50));
-                }
-                await new Promise(resolve => setTimeout(resolve, 150));
-
-                log(`Clicked form "${buttonText}" button for row ${rowId}`);
-
-            } catch (error) {
-                console.error(`Error accepting row ${rowId}:`, error);
-            }
-        }
-
-        log('Finished accepting all selected rows');
     }
 
     // Handle action button click
@@ -560,13 +491,6 @@
         return new Blob([mergedPdfBytes], {type: 'application/pdf'});
     }
 
-    // Update accept button state
-    function updateAcceptButton(button) {
-        const count = selectedRows.size;
-        button.textContent = `Bestellungen bestätigen (${count})`;
-        button.disabled = count === 0;
-    }
-
     // Update print labels button state
     function updatePrintLabelsButton(button) {
         const count = selectedRows.size;
@@ -575,7 +499,7 @@
     }
 
     // Add checkbox to a row
-    function addCheckboxToRow(row, acceptButton, printLabelsButton) {
+    function addCheckboxToRow(row, printLabelsButton) {
         // Skip if checkbox already exists
         if (row.querySelector('.row-selector-checkbox')) return;
 
@@ -602,7 +526,6 @@
                 selectedRows.delete(dataId);
                 row.classList.remove('row-selected');
             }
-            updateAcceptButton(acceptButton);
             updatePrintLabelsButton(printLabelsButton);
             updateSelectAllCheckbox();
         });
@@ -624,7 +547,7 @@
     }
 
     // Add checkbox to header
-    function addCheckboxToHeader(acceptButton, printLabelsButton) {
+    function addCheckboxToHeader(printLabelsButton) {
         const header = document.querySelector('.MuiDataGrid-columnHeaders');
         if (!header || header.querySelector('.header-selector-checkbox')) return;
 
@@ -659,7 +582,6 @@
                     }
                 }
             });
-            updateAcceptButton(acceptButton);
             updatePrintLabelsButton(printLabelsButton);
         });
 
@@ -693,7 +615,7 @@
     // Initialize
     function init() {
         injectStyles();
-        const {acceptButton, printLabelsButton, toggleButton} = createButtons();
+        const {printLabelsButton} = createButtons();
 
         // Get the button container
         const buttonContainer = document.querySelector('.button-container');
@@ -708,9 +630,9 @@
 
         // Initial setup
         setTimeout(() => {
-            addCheckboxToHeader(acceptButton, printLabelsButton);
+            addCheckboxToHeader(printLabelsButton);
             document.querySelectorAll('.MuiDataGrid-row').forEach(row => {
-                addCheckboxToRow(row, acceptButton, printLabelsButton);
+                addCheckboxToRow(row, printLabelsButton);
             });
         }, 1000);
 
@@ -720,15 +642,15 @@
                 mutation.addedNodes.forEach((node) => {
                     if (node.nodeType === 1) {
                         if (node.classList && node.classList.contains('MuiDataGrid-row')) {
-                            addCheckboxToRow(node, acceptButton, printLabelsButton);
+                            addCheckboxToRow(node, printLabelsButton);
                         }
                         if (node.classList && node.classList.contains('MuiDataGrid-columnHeaders')) {
-                            addCheckboxToHeader(acceptButton, printLabelsButton);
+                            addCheckboxToHeader(printLabelsButton);
                         }
                         // Check children
                         if (node.querySelectorAll) {
                             node.querySelectorAll('.MuiDataGrid-row').forEach(row => {
-                                addCheckboxToRow(row, acceptButton, printLabelsButton);
+                                addCheckboxToRow(row, printLabelsButton);
                             });
                         }
                     }
